@@ -1,0 +1,35 @@
+# Shared defaults. Scene/poisoning configs inherit and override this.
+# Every field that affects a result must live here or in an override —
+# never hardcoded in src/ or scripts/.
+
+model:
+  type: vanilla_nerf          # see DECISION_LOG.md D-005
+  pos_encoding_freqs: 10
+  dir_encoding_freqs: 4
+  hidden_dim: 256
+  num_layers: 8
+
+optimizer:
+  type: adam
+  lr: 5.0e-4
+  lr_decay_steps: 250000
+  lr_decay_rate: 0.1
+
+training:
+  iterations: 200000
+  batch_size: 4096
+  chunk_size: 32768           # rays per forward pass, tune to 8GB VRAM budget
+
+render:
+  num_coarse_samples: 64
+  num_fine_samples: 128
+  white_background: true
+
+reproducibility:
+  seed: null                  # must be set explicitly per-run config, never left null at train time
+  deterministic_cudnn: true
+
+logging:
+  log_every: 500
+  eval_every: 10000
+  checkpoint_every: 25000

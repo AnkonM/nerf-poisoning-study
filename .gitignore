@@ -1,10 +1,28 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
+   # Python-generated files
+   __pycache__/
+   *.py[oc]
+   build/
+   dist/
+   wheels/
+   *.egg-info
+   
+   # Virtual environments
+   .venv
+   
+   # Blender
+   *.blend1
+   *.blend2
+   
+   # Generated data (regeneratable from configs + code — see PROJECT_STRUCTURE.md)
+   data/blender_scenes/
+   data/masks/
+   data/background_plates/
+   data/poisoned/
+   
+   # Model checkpoints / training artifacts
+   *.ckpt
+   *.pth
+   
+   # OS/editor cruft
+   .DS_Store
+   .vscode/

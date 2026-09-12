@@ -11,7 +11,7 @@ that's the whole point of having gates.
 
 | Phase | Status | Gate passed? |
 |---|---|---|
-| 0 — Setup | In progress | — |
+| 0 — Setup | Complete (local) | PASS locally — RTX 5060/WSL2 matrix-multiply + compute-capability (12, 0) check passes (`scripts/verify_env.py`). **Colab/Kaggle environment parity is unverified** and deferred until the first cloud run (expected Phase 6) — see `environment/SETUP.md` §2.1 and `DECISION_LOG.md` D-009. |
 | 1 — Literature verification | Not started | — |
 | 2 — Lego clean-NeRF sanity check | Not started | — |
 | 3 — Poisoning proof of concept (Lego) | Not started | — |

@@ -178,3 +178,48 @@ not just what it currently looks like.
   image/JSON files; if WSL2/WSLg Blender support becomes preferable later,
   switching only affects Phase 4 tooling, not any already-frozen data or
   results.
+
+## D-009 — uv (not conda) as local package manager; cu128→cu130 reconciliation
+
+- **Date:** 2026-09-12
+- **Decision:** two related corrections to Phase 0 setup, superseding the
+  conda-based wording in D-006/`environment/SETUP.md` §1.5 and the exact
+  cu128 pin implied by D-005/`environment/SETUP.md` §1.3 (neither D-005 nor
+  D-006 is edited — this entry supersedes the relevant parts of both, per
+  this log's append-only rule):
+  1. **Package manager:** the project standardizes on `uv`
+     (`pyproject.toml` + `uv.lock`) for the local environment, not conda.
+     `environment/environment.yml` is deleted; `environment/SETUP.md` §1.5
+     now documents `uv sync` instead of `conda env create`.
+  2. **CUDA wheel version:** cu128 was always intended as a *minimum
+     floor* (the first cu-tagged wheel line with native sm_120/Blackwell
+     support), not a required exact pin. The environment actually in use
+     (`pyproject.toml`'s `cu130` index, `torch==2.14.0+cu130` per
+     `uv.lock`) has been verified working on the reference dev machine
+     (RTX 5060 laptop) — `scripts/verify_env.py` reports compute
+     capability `(12, 0)` and a passing GPU matrix multiply. cu130 is now
+     the documented pinned version; cu128 remains the floor for anyone
+     building on older wheels.
+- **Alternatives considered:** (a) actually installing conda/miniconda
+  locally to match the original `environment.yml` plan; (b) rolling the
+  existing `pyproject.toml`/`uv.lock` back to an exact `cu128` pin to match
+  the original wording literally.
+- **Rationale / evidence:** (a) was rejected because conda was never
+  actually installed or needed on this machine — a working `uv`-managed
+  `.venv` with a functioning CUDA-enabled torch already existed before
+  Phase 0 setup began, and installing a second, redundant package manager
+  just to match documentation that predated that `.venv` would be pure
+  overhead with no functional benefit. (b) was rejected because cu130 is
+  already verified working on the exact reference hardware this project
+  targets, and downgrading a working, verified install to match a
+  conservative floor chosen before any hardware verification happened
+  would trade a real, tested result for an untested "safer-looking" one.
+- **Reversibility:** low cost. Package manager: switching back to conda
+  would only mean re-adding `environment/environment.yml` and reverting
+  `environment/SETUP.md` §1.5 — no code depends on the choice of manager.
+  CUDA wheel version: `pyproject.toml`'s `[[tool.uv.index]]` URL and the
+  version pins are the only places this is encoded; falling back to cu128
+  would be a one-line index change if cu130 ever proves unstable. Colab/
+  Kaggle parity (cu128 floor, since those platforms are not Blackwell) is
+  unaffected either way and remains untested until the first cloud run
+  (Phase 6) — see `docs/ROADMAP.md` status tracker.

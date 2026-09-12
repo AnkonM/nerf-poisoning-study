@@ -1,0 +1,24 @@
+# Pip fallback for Colab/Kaggle. The torch/torchvision/torchaudio pins below
+# must mirror pyproject.toml's resolved versions (per uv.lock) exactly — if
+# you bump one, bump the other in the same commit, or the "identical
+# environment everywhere" guarantee this split depends on breaks silently.
+# See environment/SETUP.md §2.1 and DECISION_LOG.md D-009.
+#
+# NOTE: the remaining packages below (numpy through lpips) are not yet
+# declared in pyproject.toml/uv.lock — they exist only here. This is a
+# tracked gap, not an oversight: `uv sync` locally and `pip install -r
+# requirements.txt` on Colab/Kaggle are therefore NOT yet fully equivalent
+# environments. Add these to pyproject.toml (`uv add ...`) before Phase 5/6
+# so both paths resolve the same set, per DECISION_LOG.md D-009.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.0+cu130        # pinned to match pyproject.toml/uv.lock exactly, see DECISION_LOG.md D-009 (cu128+ is the floor if cu130 is unavailable)
+torchvision==0.29.0+cu130  # pinned to match pyproject.toml/uv.lock exactly
+torchaudio==2.11.0+cu130   # pinned to match pyproject.toml/uv.lock exactly (present in pyproject.toml though unused by the NeRF pipeline so far — see discrepancy note)
+numpy>=1.26             # tensor/array interop, camera-pose math
+imageio>=2.34           # read/write Blender-rendered PNGs and camera-pose data
+opencv-python>=4.9      # mask dilation (fixed dilation amount, METHODOLOGY.md §3)
+pyyaml>=6.0             # configs/*.yaml loading — the project's single source of truth for run params
+tqdm>=4.66              # training-loop progress over 200k iterations (configs/base.yaml)
+tensorboard>=2.16       # loss-curve logging/inspection, required by ROADMAP.md Phase 6 convergence gate
+scikit-image>=0.23      # SSIM implementation, METHODOLOGY.md §6 metrics
+lpips>=0.1.4            # LPIPS implementation, METHODOLOGY.md §6 metrics

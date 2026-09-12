@@ -1,9 +1,11 @@
 # Environment Setup
 
-Two environments, kept in sync via `environment.yml`/`requirements.txt`:
-**local (WSL2)** for development/debugging/small runs, **cloud
-(Colab/Kaggle)** for the bulk of the Phase 6 sweep. See `DECISION_LOG.md`
-D-005 and D-006 for why this split and why vanilla NeRF is the default model.
+Two environments, kept in sync via `pyproject.toml`/`uv.lock` (local) and
+`requirements.txt` (cloud): **local (WSL2)** for development/debugging/small
+runs, **cloud (Colab/Kaggle)** for the bulk of the Phase 6 sweep. See
+`DECISION_LOG.md` D-005, D-006, and D-009 for why this split, why vanilla
+NeRF is the default model, and why `uv` (not conda) is the local package
+manager.
 
 ## 1. Local: WSL2 on Windows 11
 
@@ -30,8 +32,15 @@ not install a separate Linux NVIDIA driver inside WSL2).
 The RTX 5060 laptop GPU is Blackwell architecture (sm_120, compute
 capability 12.0). Stable PyTorch releases only gained native sm_120 support
 from version 2.7.0 with CUDA 12.8 wheels — installing PyTorch without
-pinning this explicitly risks silently falling back to an unsupported
-kernel path.
+pinning at least this explicitly risks silently falling back to an
+unsupported kernel path.
+
+**Verified minimum: PyTorch 2.7+/cu128.** This project's `pyproject.toml`
+currently pins `cu130` wheels (torch 2.14.0+cu130), which has been verified
+working on this hardware (RTX 5060 laptop, compute capability (12, 0) — see
+§1.4 and `DECISION_LOG.md` D-009). cu128 remains the documented floor for
+anyone building the environment on older/pinned wheels; it is not a
+required exact match — any cu128+ build that passes the §1.4 check is fine.
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128
@@ -57,12 +66,22 @@ available for execution on the device`.
 
 ### 1.5 Clone repo, create environment
 
+This project uses `uv` (not conda) to manage the local Python environment —
+see `DECISION_LOG.md` D-009. `pyproject.toml` + `uv.lock` are the source of
+truth for pinned versions.
+
 ```bash
 git clone <repo_url> nerf-poisoning-study
 cd nerf-poisoning-study
-conda env create -f environment/environment.yml
-conda activate nerf-poisoning
+uv sync
+source .venv/bin/activate
 ```
+
+`uv sync` creates `.venv/` (if it doesn't already exist) and installs
+exactly the locked dependency versions from `uv.lock`. Run
+`python scripts/verify_env.py` from inside the activated `.venv` (or
+`uv run python scripts/verify_env.py` without activating) to confirm the
+GPU is actually being used — see §1.4.
 
 ### 1.6 Known risk: tiny-cuda-nn / Nerfacto
 
@@ -82,9 +101,13 @@ training runs don't tie up the laptop.
 ```python
 !pip install -r requirements.txt
 ```
-`requirements.txt` mirrors `environment.yml` exactly — if you change one,
-change the other in the same commit, or the "identical environment
-everywhere" guarantee this split depends on breaks silently.
+`requirements.txt` must resolve to the same versions as `pyproject.toml`/
+`uv.lock` — if you change one, change the other in the same commit, or the
+"identical environment everywhere" guarantee this split depends on breaks
+silently. Colab/Kaggle GPUs are not Blackwell/sm_120, so the cu128 floor
+(not the cu130 pin verified in §1.3) is what actually gets exercised there;
+this is untested and tracked as an open item until the first cloud run (see
+`docs/ROADMAP.md` Phase 0 status tracker).
 
 ### 2.2 Repo access
 
@@ -163,8 +186,9 @@ data-provenance trail stays intact.
 - [ ] `nvidia-smi` shows the RTX 5060 in WSL2.
 - [ ] The compute-capability verification script above prints `(12, 0)` and
   "PASSED".
-- [ ] `environment.yml` installs cleanly and produces the same PyTorch/CUDA
-  versions on WSL2, Colab, and Kaggle.
+- [ ] `uv sync` installs cleanly locally, and `requirements.txt` installs
+  cleanly and produces a compatible PyTorch/CUDA build on Colab and Kaggle
+  (unverified as of Phase 0 — see `docs/ROADMAP.md` status tracker).
 - [ ] Blender (native Windows install) opens, shows the RTX 5060 under
   OptiX in Preferences, and `blender.exe --background scene.blend --python
   scripts/render_scene.py` runs successfully from a Windows terminal

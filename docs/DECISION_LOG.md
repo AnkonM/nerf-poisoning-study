@@ -294,3 +294,116 @@ not just what it currently looks like.
   `.gitkeep` files are removed/replaced the moment real code lands in
   Phase 2+; no design decision is locked in by this fix beyond "the src/
   layout now matches what `pyproject.toml` already declared."
+
+## D-012 — Phase 1 literature verification: novelty claim reconfirmed
+
+- **Date:** 2026-09-12
+- **Decision/finding:** the novelty claim from the original feasibility
+  assessment still holds. No published work combines (a) a
+  poisoning-budget sweep defined over target-visible views, (b) a
+  NeRF-specific attack, (c) an object-suppression/removal goal, and (d) an
+  explicit collateral-damage-vs-budget curve as the central result.
+- **Evidence reviewed:**
+  - **IPA-NeRF** (ECAI 2024, arXiv:2407.11921) — bi-level optimization,
+    single backdoor-viewpoint illusion injection, ablates distortion
+    budget (epsilon) and angle constraints, not poisoned-view-fraction.
+  - **StealthAttack** (arXiv:2510.02314, Oct 2025) — density-guided
+    Gaussian injection for 3DGS (not NeRF), illusion-injection goal,
+    ablates number of poisoned viewpoints (2/3/4) as "how many views show
+    the same illusion," reports innocent-view (V-TEST) fidelity alongside
+    attack success — closest adjacent pattern to a budget/collateral
+    framing, but wrong representation and wrong attack goal.
+  - **Poison-splat** (arXiv:2410.08190, 2024) — the one paper found with
+    an actual poisoning-ratio sweep (20/40/60/80%, randomly selected
+    views) on 3DGS, but the attack goal is a compute-cost/memory
+    denial-of-service, unrelated to visual/object integrity.
+  - **Shielding the Unseen** (arXiv:2310.03125, 2023) — untargeted
+    whole-scene spatial-deformation degradation (privacy motivation), not
+    object-selective.
+  - **Generalizable Targeted Data Poisoning** (arXiv:2412.03908, 2024) and
+    the "Checkerboard" clean-label backdoor line of work —
+    poisoning-budget-vs-success-rate curves, but for 2D image classifiers,
+    not 3D scene reconstruction.
+- **Conclusion:** no deviation to `METHODOLOGY.md` required. Novelty
+  classification unchanged from the original feasibility assessment
+  ("Meaningfully differentiated empirical study," bordering "Potentially
+  novel research direction").
+- **Reversibility:** n/a (a finding, not a design decision) — revisit if a
+  focused re-check before Phase 6 write-up surfaces a new publication
+  combining all four elements above.
+
+## D-013 — Phase 2 clean-Lego PSNR comparison basis, fixed before training
+
+- **Date:** 2026-09-12
+- **Decision:** Phase 2's gate is satisfied if this project's clean-Lego
+  PSNR on held-out test views falls within approximately **29–33 dB**.
+  Below that range is a pipeline bug to fix, not a result to report.
+- **Primary reference:** the original NeRF paper (Mildenhall et al. 2020)
+  reports Lego PSNR = 32.54 dB, per the comparison table in Mip-NeRF
+  (Barron et al. 2021, arXiv:2103.13415), which directly cites the
+  original NeRF numbers.
+- **Reproduction variance context:** independent reproductions of vanilla
+  NeRF on Lego have reported PSNR as low as ~29.5 (per a GL-NeRF paper's
+  own reproduction, arXiv:2410.19831) and as high as ~31.65 (per a
+  Rip-NeRF paper's reproduction, arXiv:2405.02386), confirming a realistic
+  acceptance range of roughly 29.5–32.5 dB rather than requiring an exact
+  match to 32.54.
+- **Rationale / evidence:** fixing the comparison range *before* running
+  anything (per `ROADMAP.md`'s Phase 2 gate instructions) is what makes
+  the gate a real check rather than a post-hoc rationalization — if the
+  range were picked after seeing a number, it would stop being a gate.
+- **Reversibility:** must be locked before training per the above; a
+  training run that misses this window is a documented pipeline bug to
+  fix (see Phase 2 gate outcome in `ROADMAP.md`'s status tracker), not
+  grounds for redefining the range afterward.
+
+## D-014 — Fixed the same literal brace-glob bug under `data/`
+
+- **Date:** 2026-09-12
+- **Decision:** removed an empty, incorrectly-named directory at
+  `data/{raw,blender_scenes,poisoned,masks}` (the same class of bug as
+  D-011, in `data/` instead of `src/` — an unexpanded shell brace-glob
+  from the original repo scaffolding). Never git-tracked, confirmed empty.
+  Replaced with the real directories per `PROJECT_STRUCTURE.md`:
+  `data/raw/`, `data/blender_scenes/`, `data/masks/`,
+  `data/background_plates/`, `data/poisoned/`. Also added
+  `data/nerf_synthetic/` — an undocumented-until-now directory holding the
+  external Blender Synthetic dataset used for Phase 2's sanity check only;
+  it is separate from `data/raw/` (reserved for this project's own
+  `.blend` scene files) and `data/blender_scenes/` (reserved for the
+  Phase 4 main-study scene, subject to the eval-holdout freeze rule) —
+  documented in `PROJECT_STRUCTURE.md` and excluded from git via
+  `.gitignore` (241MB of downloaded PNGs, not generated by any script
+  here).
+- **Rationale / evidence:** found while setting up Phase 2's dataset
+  directory; fixing it now (rather than routing around it) keeps
+  `PROJECT_STRUCTURE.md`'s documented tree accurate, consistent with how
+  D-011 handled the identical bug pattern in `src/`.
+- **Reversibility:** trivial — these are empty placeholder directories
+  (aside from the downloaded, gitignored Lego data) with no design
+  decision locked in.
+
+## D-015 — Fixed a silently-broken `.gitignore` (every pattern had 3 leading spaces)
+
+- **Date:** 2026-09-12
+- **Decision:** stripped the 3 leading spaces baked into every line of the
+  top-level `.gitignore` (from the original scaffold — `sed -n l` / `cat
+  -A` showed every pattern, including comments, prefixed with `   `).
+  Confirmed via `git check-ignore -v` that this made every single pattern
+  in the file a silent no-op: `__pycache__/`, `*.pth`, `data/blender_scenes/`,
+  and even `.venv` were **not actually being ignored** by this file (`.venv`
+  merely never showed up in `git status` because it carries its own nested
+  `.venv/.gitignore`, unrelated to the project's). After stripping the
+  leading whitespace, `git check-ignore -v` confirms all of the patterns
+  exercised so far (`__pycache__/`, `.venv`, `data/nerf_synthetic/`,
+  `experiments/runs/`) now match correctly.
+- **Rationale / evidence:** found while adding vendored code under `src/`
+  for Phase 2 and noticing `__pycache__/` directories showing as untracked
+  in `git status` despite `.gitignore` listing that exact pattern. This is
+  the same class of issue as D-011/D-014 (a scaffold-generated file with a
+  formatting defect that silently did nothing until something finally
+  exercised it) — fixed immediately rather than routed around, since a
+  non-functional `.gitignore` risks accidentally committing large
+  generated/checkpoint files later in the study.
+- **Reversibility:** trivial — whitespace-only change, no ignore rules
+  were added, removed, or reworded, just made to actually take effect.

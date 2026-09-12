@@ -1,0 +1,41 @@
+# Phase 2 pipeline-verification config — Blender Synthetic Lego, per
+# docs/ROADMAP.md Phase 2 and docs/PROJECT_STRUCTURE.md. Not a paper
+# result (README.md ground rules / ROADMAP.md Phase 2 "explicitly not a
+# paper result").
+#
+# Overrides below vs. configs/base.yaml follow the original NeRF paper's
+# published Blender-scene hyperparameters (yenchenlin/nerf-pytorch's
+# configs/lego.txt, vendored per docs/DECISION_LOG.md D-005), so the
+# clean-Lego PSNR check in docs/DECISION_LOG.md D-013 is comparing against
+# a run using the same hyperparameters the reference numbers were measured
+# with — not an under/over-tuned variant of them.
+defaults:
+  - ../base.yaml
+
+dataset:
+  type: blender
+  path: data/nerf_synthetic/lego
+  half_res: true          # 400x400, matches lego.txt half_res=True
+  testskip: 1              # evaluate the full 200-view test set, not a subsample
+  near: 2.0
+  far: 6.0
+
+optimizer:
+  # lego.txt: lrate_decay = 500 (thousand steps) -> 500,000 steps, not
+  # configs/base.yaml's generic 250,000-step default.
+  lr_decay_steps: 500000
+
+training:
+  # lego.txt: N_rand = 1024, not configs/base.yaml's generic 4096 default.
+  batch_size: 1024
+  netchunk: 65536          # points per network forward pass (1024*64, lego.txt default)
+  precrop_iters: 500       # lego.txt: precrop_iters = 500
+  precrop_frac: 0.5        # lego.txt: precrop_frac = 0.5
+
+render:
+  use_viewdirs: true        # lego.txt: use_viewdirs = True
+  perturb: 1.0               # stratified sampling jitter (original default)
+  raw_noise_std: 0.0         # no density-noise regularization (original default)
+
+reproducibility:
+  seed: 0                    # matches the original codebase's np.random.seed(0)

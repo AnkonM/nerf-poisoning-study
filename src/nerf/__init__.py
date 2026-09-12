@@ -1,20 +1,28 @@
-"""Vanilla NeRF model/training code (vendored + adapted).
+"""Vanilla NeRF model/training code — vendored + adapted.
 
-Placeholder package created during Phase 0 solely to satisfy uv_build's
-src-layout requirement for the `nerf` package declared in pyproject.toml
-(see docs/DECISION_LOG.md D-011). No research code has been written yet —
-that begins in Phase 2 per docs/ROADMAP.md.
+Vendored from yenchenlin/nerf-pytorch (MIT license — see
+THIRD_PARTY_LICENSE in this directory), commit 63a5a630c9abd62b0f21c08703
+d0ac2ea7d4b9dd, chosen per docs/DECISION_LOG.md D-005 (pure PyTorch, no
+custom CUDA extensions) and its own recommendation writeup. Adapted from
+the original's configargparse/CLI-driven structure to this project's
+config-driven one (docs/PROJECT_STRUCTURE.md): hyperparameters are
+resolved from configs/*.yaml, not CLI flags, and the original's single
+run_nerf.py script is split into model.py / rays.py / rendering.py /
+training.py / datasets/blender.py. The core numerical routines (ray
+generation, hierarchical sampling, volumetric rendering) are kept
+faithful to the original — this is a restructuring for this project's
+conventions, not a reimplementation of the underlying math.
 """
 
 
 def main() -> None:
     """Placeholder entry point for the `nerf` console script.
 
-    Not implemented yet — the real CLI surface for this project is the
-    scripts/ entry points (render_scene.py, build_poison_set.py, train.py,
-    evaluate.py) per docs/PROJECT_STRUCTURE.md, added starting Phase 2+.
+    Not implemented — the real CLI surface for this project is the
+    scripts/ entry points (scripts/train.py, scripts/evaluate.py, ...)
+    per docs/PROJECT_STRUCTURE.md.
     """
     raise NotImplementedError(
-        "nerf:main is a Phase 0 placeholder. Use the scripts/ CLI entry "
-        "points once they exist (see docs/PROJECT_STRUCTURE.md)."
+        "nerf:main is a scaffold placeholder. Use scripts/train.py "
+        "<config_path> instead (see docs/PROJECT_STRUCTURE.md)."
     )

@@ -37,9 +37,14 @@ nerf-poisoning-study/
 │   │   └── cameras.json
 │   ├── masks/                      # object-ID / alpha masks, one per view, from Blender
 │   ├── background_plates/          # target-object-toggled-off renders, one per view
-│   └── poisoned/
-│       ├── <condition_id>/         # one folder per poisoning condition, script-generated
-│       └── MANIFEST.csv            # which views were poisoned, by what recipe, per condition
+│   ├── poisoned/
+│   │   ├── <condition_id>/         # one folder per poisoning condition, script-generated
+│   │   └── MANIFEST.csv            # which views were poisoned, by what recipe, per condition
+│   └── nerf_synthetic/             # external Blender Synthetic dataset (e.g. lego/), Phase 2
+│       │                           # pipeline sanity-check ONLY — not part of the main study,
+│       │                           # not subject to the eval-holdout freeze rule, downloaded
+│       │                           # not generated, gitignored (large binary assets)
+│       └── lego/
 ├── src/
 │   ├── nerf/                       # vanilla NeRF model/training code (vendored + adapted)
 │   ├── poisoning/                  # compositing scripts: hard erasure, soft suppression

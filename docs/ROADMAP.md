@@ -41,9 +41,10 @@ with research findings later.
   silently falling back to CPU or an unsupported kernel path (see
   `environment/SETUP.md` for the verification script).
 - [ ] Initialize git repo; adopt the structure in `docs/PROJECT_STRUCTURE.md`.
-- [ ] Set up `configs/`, `environment.yml`/`requirements.txt`, and confirm
-  the exact same environment spec installs cleanly on Colab and Kaggle
-  (this is what makes the local/cloud split in `environment/SETUP.md`
+- [ ] Set up `configs/`, `pyproject.toml`/`uv.lock` (local) and
+  `requirements.txt` (generated from the lockfile, for Colab/Kaggle), and
+  confirm the exact same environment spec installs cleanly on Colab and
+  Kaggle (this is what makes the local/cloud split in `environment/SETUP.md`
   actually usable, not aspirational).
 - [ ] Choose and pin: vanilla NeRF implementation to adapt (record choice +
   source repo in `DECISION_LOG.md`).

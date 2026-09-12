@@ -223,3 +223,74 @@ not just what it currently looks like.
   Kaggle parity (cu128 floor, since those platforms are not Blackwell) is
   unaffected either way and remains untested until the first cloud run
   (Phase 6) — see `docs/ROADMAP.md` status tracker.
+
+## D-010 — pyproject.toml completed as single dependency source of truth; torchaudio dropped
+
+- **Date:** 2026-09-12
+- **Decision:**
+  1. `pyproject.toml` (via `uv add`) now declares the full pipeline
+     dependency set — `numpy`, `imageio`, `opencv-python`, `pyyaml`,
+     `tqdm`, `tensorboard`, `scikit-image`, `lpips` — in addition to the
+     existing torch stack, closing the gap flagged after D-009 where these
+     lived only in `requirements.txt`. `environment/requirements.txt` is
+     now machine-generated from `uv.lock` (`uv export --no-hashes --no-dev
+     --no-editable --no-emit-project --emit-index-url`) rather than
+     hand-maintained, so the two can no longer drift apart by construction.
+  2. `torchaudio` is removed from `pyproject.toml`/`uv.lock` (via `uv
+     remove`) and from `requirements.txt`.
+- **Alternatives considered:** continuing to hand-maintain
+  `requirements.txt` as a second, manually-synced list; keeping
+  `torchaudio` in case it becomes useful later.
+- **Rationale / evidence:** hand-maintaining two dependency lists is
+  exactly the kind of untracked-divergence risk `PROJECT_STRUCTURE.md`
+  warns against generally — generating one from the other removes the
+  failure mode entirely instead of relying on discipline to keep them in
+  sync. `torchaudio` has no role in this vision-only NeRF pipeline (no
+  audio data, model, or metric anywhere in `METHODOLOGY.md`); it was dead
+  weight pulled in by the original project scaffold, not a deliberate
+  future dependency, so it's removed now rather than carried forward
+  unused.
+- **Reversibility:** low cost either way. Re-adding `torchaudio` is a
+  single `uv add torchaudio`; regenerating `requirements.txt` after any
+  future `pyproject.toml` change is the one documented command in the
+  file's own header comment.
+
+## D-011 — Fixed a scaffold bug blocking `uv`: literal brace-glob directory under `src/`
+
+- **Date:** 2026-09-12
+- **Decision:** removed an empty, incorrectly-named directory at
+  `src/{nerf,poisoning,data_pipeline,metrics,utils}` (a literal directory
+  name, not five separate directories — the result of an unexpanded shell
+  brace-glob from the original repo scaffolding, e.g. `mkdir` run under a
+  shell/context where `{a,b,c}` doesn't expand). This directory predates
+  this session's work and was never git-tracked (git does not track empty
+  directories, and it appears nowhere in `git log --all`). In its place,
+  created the actual five directories: `src/nerf/` (with a placeholder
+  `__init__.py`, since `pyproject.toml`'s `uv_build` backend requires
+  `src/nerf/__init__.py` to build the declared `nerf` package — this was
+  the only one of the five the build system actually required) and
+  `src/poisoning/`, `src/data_pipeline/`, `src/metrics/`, `src/utils/`
+  (each with a `.gitkeep` placeholder — not required by the build system,
+  just the documented `PROJECT_STRUCTURE.md` layout ahead of Phase 5+ code).
+- **Alternatives considered:** marking the project non-buildable via
+  `[tool.uv] package = false` in `pyproject.toml` to sidestep the build
+  requirement entirely, rather than fixing `src/`; leaving the bug and
+  routing around it with `uv add --frozen` (which would have added
+  dependency declarations without actually locking/syncing them, silently
+  leaving the environment in a state that only looks correct).
+- **Rationale / evidence:** the bug was completely silent until `uv
+  add`/`uv sync` was attempted for the first time (D-010's dependency
+  work) — nothing before that point exercised the build path, so it sat
+  undetected since initial scaffolding. Fixing the actual `src/` layout
+  (rather than disabling packaging) keeps `pyproject.toml`'s existing
+  intent — a real, buildable `nerf` package plus a working `nerf` console
+  script — intact, and is the more honest fix given the placeholder
+  `__init__.py` costs nothing and unblocks the declared build config
+  exactly as originally intended, rather than quietly changing what
+  `pyproject.toml` claims about itself. This is exactly the kind of
+  silent-failure-turned-loud-discrepancy `DECISION_LOG.md` exists to
+  catch, per this project's ground rules in `README.md`.
+- **Reversibility:** trivial — the placeholder `src/nerf/__init__.py` and
+  `.gitkeep` files are removed/replaced the moment real code lands in
+  Phase 2+; no design decision is locked in by this fix beyond "the src/
+  layout now matches what `pyproject.toml` already declared."

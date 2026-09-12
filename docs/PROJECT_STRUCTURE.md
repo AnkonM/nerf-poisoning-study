@@ -62,8 +62,7 @@ nerf-poisoning-study/
 │   └── exploratory/                # scratch analysis only — nothing here is load-bearing
 ├── environment/
 │   ├── SETUP.md                    # local (WSL2) + cloud (Colab/Kaggle) setup instructions
-│   ├── environment.yml             # conda environment, pinned versions
-│   └── requirements.txt            # pip fallback / Colab install list
+│   └── requirements.txt            # pip fallback for Colab/Kaggle, generated from pyproject.toml/uv.lock — do not hand-edit
 ├── tests/                          # unit tests for compositor, metrics, view selection
 └── paper/
     ├── draft.md

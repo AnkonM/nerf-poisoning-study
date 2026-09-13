@@ -106,17 +106,35 @@ def evaluate_psnr(
     K,
     chunk: int,
     render_kwargs_test: Dict[str, Any],
+    show_progress: bool = False,
 ) -> float:
-    """Render each of `indices` and return the mean per-image PSNR (dB)."""
+    """Render each of `indices` and return the mean per-image PSNR (dB).
+
+    `show_progress`: report per-image timing/PSNR via tqdm as it goes,
+    rather than staying silent until the whole set is done. This phase (a
+    full-image render loop, as opposed to the cheap per-ray training
+    steps) can legitimately take a long time — see docs/DECISION_LOG.md's
+    Phase 2 incident notes — and having no progress signal made a slow
+    but healthy run indistinguishable from a hang. Off by default so the
+    periodic small-subset call during training doesn't spam the log.
+    """
     H, W, _ = hwf
     psnrs = []
+    iterator = tqdm(indices, desc="test-set eval") if show_progress else indices
     with torch.no_grad():
-        for idx in indices:
+        for idx in iterator:
+            t0 = time.time()
             c2w = torch.Tensor(poses[idx]).to(device)
             target = torch.Tensor(images[idx]).to(device)
             rgb, _, _, _ = render(H, W, K, chunk=chunk, c2w=c2w[:3, :4], **render_kwargs_test)
             mse = img2mse(rgb, target)
-            psnrs.append(mse2psnr(mse).item())
+            image_psnr = mse2psnr(mse).item()
+            psnrs.append(image_psnr)
+            if show_progress:
+                tqdm.write(
+                    f"[eval] view {idx}: psnr {image_psnr:.3f} dB "
+                    f"({time.time() - t0:.2f}s, running mean {np.mean(psnrs):.3f} dB)"
+                )
     return float(np.mean(psnrs))
 
 

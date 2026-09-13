@@ -32,8 +32,16 @@ Read in this order:
 
 ## Current status
 
-See the top of `docs/ROADMAP.md` for the live phase tracker. As of project
-start: **Phase 0 (setup) in progress.**
+See the top of `docs/ROADMAP.md` for the live phase tracker (single
+source of truth — this section is not).
+
+**Resuming work in a new conversation?** Start with the most recent file
+in [`docs/handoffs/`](docs/handoffs/) — it's the fastest way to get
+oriented. A new handoff file is created at the end of every phase
+closeout, following [`docs/handoffs/TEMPLATE.md`](docs/handoffs/TEMPLATE.md).
+It is an index only, though: still read `README.md`, `docs/ROADMAP.md`,
+`docs/METHODOLOGY.md`, and `docs/DECISION_LOG.md` in full before acting on
+anything.
 
 ## Ground rules for this project
 

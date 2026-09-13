@@ -407,3 +407,56 @@ not just what it currently looks like.
   generated/checkpoint files later in the study.
 - **Reversibility:** trivial — whitespace-only change, no ignore rules
   were added, removed, or reworded, just made to actually take effect.
+
+## D-016 — Phase 2 gate result: clean-Lego PSNR PASS (31.55 dB)
+
+- **Date:** 2026-09-13
+- **Decision/finding:** Phase 2's gate **PASSES**. Final held-out
+  test-set PSNR is **31.550 dB** over all 200 `transforms_test.json`
+  views, against the D-013 acceptance range of **29–33 dB**. 31.55 dB
+  falls solidly inside that range, not near either edge.
+- **Training details:** `configs/scenes/lego_sanity.yaml`, vendored
+  vanilla NeRF (`src/nerf/`, per D-005), seed 0, 200,000/200,000
+  iterations completed (no early stop, no divergence). Trained locally on
+  WSL2, RTX 5060 laptop GPU, PyTorch 2.14.0+cu130. Training-loop wall time
+  11.91h; final train-batch PSNR 33.36 dB, val-subset PSNR 31.63 dB at
+  iteration 200,000 (both consistent with the independently-recomputed
+  200-view test PSNR below). Git commit at training start:
+  `d1906094dd7437f5c0bc582d989a35991940df43`.
+- **Incident during this run (full detail in the conversation record, summarized
+  here for the audit trail):** the vendored training script's built-in
+  post-training behavior (`src/nerf/training.py`) automatically renders
+  the full test set before returning, with no per-image progress logging
+  at the time. Combined with the run sitting at ~7.3–7.6GB/8.15GB VRAM,
+  this full-test-set render took **5.5+ hours** on the original run (vs.
+  an expected ~40–70 min) and was indistinguishable from a hang from the
+  log alone — GPU stayed at 100% util and the process kept accumulating
+  CPU ticks throughout, confirming it was genuinely still computing, just
+  starved for VRAM headroom. Diagnosed via `/proc/<pid>/stat` CPU-tick
+  deltas across repeated samples (a hang would show flat ticks; this
+  didn't), not by guessing. Resolved by: (1) killing that process
+  (weights were already checkpointed at iteration 200,000 in
+  `200000.tar`, so no retraining was lost), (2) adding per-image
+  progress logging to `evaluate_psnr` (`show_progress` argument,
+  `src/nerf/training.py`), (3) adding `scripts/evaluate.py` — a
+  standalone, previously-planned-but-unbuilt entry point
+  (`PROJECT_STRUCTURE.md`) that loads a checkpoint and re-evaluates
+  without retraining, and (4) re-running the test-set evaluation alone
+  with full VRAM headroom, which completed in 38.2 minutes — closely
+  matching the original estimate and confirming the VRAM-contention
+  diagnosis. The 31.550 dB figure above is from that clean, standalone
+  re-evaluation, not the original contended run.
+- **Sample renders:** 4 novel test views (indices 200, 266, 333, 399),
+  each saved as a ground-truth | rendered side-by-side PNG, at
+  `experiments/results/phase2_lego_sanity/`. Visual check: structurally
+  correct (recognizable Lego model, correct colors/geometry, no floaters
+  or missing geometry), somewhat softer than ground truth on fine detail
+  (tread patterns, thin structural bars) — consistent with a
+  properly-converged vanilla NeRF at this quality level, not a pipeline
+  bug.
+- **Rationale / evidence:** this is the reference-basis comparison locked
+  in D-013, applied to the actual measured number, per `ROADMAP.md`
+  Phase 2's gate ("do not proceed to Phase 3 on a pipeline that hasn't
+  hit this number").
+- **Reversibility:** n/a (a measured result, not a design decision).
+  Phase 3 may now begin per `ROADMAP.md`.

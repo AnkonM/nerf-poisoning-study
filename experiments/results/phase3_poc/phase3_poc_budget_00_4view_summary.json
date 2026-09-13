@@ -1,0 +1,28 @@
+{
+  "run_id": "phase3_poc_budget_00",
+  "checkpoint": "experiments/runs/phase3_poc_budget_00/030000.tar",
+  "views": {
+    "200": {
+      "full_psnr": 28.579927444458008,
+      "masked_psnr": 23.78577423095703,
+      "file": "phase3_poc_budget_00_view200_psnr28.58.png"
+    },
+    "266": {
+      "full_psnr": 27.80275535583496,
+      "masked_psnr": 23.234111785888672,
+      "file": "phase3_poc_budget_00_view266_psnr27.80.png"
+    },
+    "333": {
+      "full_psnr": 27.91826057434082,
+      "masked_psnr": 23.31423568725586,
+      "file": "phase3_poc_budget_00_view333_psnr27.92.png"
+    },
+    "399": {
+      "full_psnr": 28.775146484375,
+      "masked_psnr": 24.03030014038086,
+      "file": "phase3_poc_budget_00_view399_psnr28.78.png"
+    }
+  },
+  "mean_full_psnr": 28.269022464752197,
+  "mean_masked_psnr": 23.591105461120605
+}

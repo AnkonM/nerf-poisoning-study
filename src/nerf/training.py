@@ -138,10 +138,25 @@ def evaluate_psnr(
     return float(np.mean(psnrs))
 
 
-def train_from_config(cfg: Dict[str, Any], run_dir: str, run_id: str = "run") -> Dict[str, Any]:
+def train_from_config(
+    cfg: Dict[str, Any],
+    run_dir: str,
+    run_id: str = "run",
+    skip_final_test_eval: bool = False,
+) -> Dict[str, Any]:
     """Train one NeRF per `cfg`, checkpointing/logging under `run_dir`.
 
     Returns a summary dict including the final held-out test-set PSNR.
+
+    `skip_final_test_eval`: if True, skip the automatic full-test-set
+    render this function otherwise runs before returning. Default False
+    preserves the original behavior (needed for Phase 2 reproducibility —
+    see docs/DECISION_LOG.md D-016). Added because that automatic eval
+    runs while the training process still holds its VRAM allocations,
+    which is exactly the contention documented in D-016 (a 5.5h stall vs.
+    ~40-70min under headroom); callers doing their own multi-run sweep
+    should set this True and evaluate afterward via scripts/evaluate.py
+    (a separate, fresh process, at full VRAM headroom) instead.
     """
     seed = cfg["reproducibility"]["seed"]
     if seed is None:
@@ -298,8 +313,13 @@ def train_from_config(cfg: Dict[str, Any], run_dir: str, run_id: str = "run") ->
     elapsed = time.time() - t0
     print(f"Training loop finished in {elapsed / 3600:.2f} h")
 
-    test_psnr = evaluate_psnr(images, poses, i_test, hwf, K, training_cfg["chunk_size"], render_kwargs_test)
-    writer.add_scalar("test/psnr_final", test_psnr, n_iters - 1)
+    if skip_final_test_eval:
+        print("Skipping automatic full-test-set eval (skip_final_test_eval=True) — "
+              "run scripts/evaluate.py separately, per docs/DECISION_LOG.md D-016.")
+        test_psnr = None
+    else:
+        test_psnr = evaluate_psnr(images, poses, i_test, hwf, K, training_cfg["chunk_size"], render_kwargs_test)
+        writer.add_scalar("test/psnr_final", test_psnr, n_iters - 1)
     writer.close()
 
     final_ckpt_path = os.path.join(run_dir, f"{n_iters - 1:06d}.tar")

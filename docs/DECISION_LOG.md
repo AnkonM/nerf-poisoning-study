@@ -460,3 +460,110 @@ not just what it currently looks like.
   hit this number").
 - **Reversibility:** n/a (a measured result, not a design decision).
   Phase 3 may now begin per `ROADMAP.md`.
+
+## D-017 — Phase 3 Lego PoC: mask/background-proxy/`V_target` choices (scoped to this PoC only)
+
+- **Date:** 2026-09-13
+- **Decision:** for the Phase 3 pipeline-mechanics PoC on the Blender
+  Synthetic Lego dataset only (`ROADMAP.md` Phase 3), fix these three
+  choices, all separate from and non-binding on the Phase 4 final-scene
+  protocol:
+  1. **Mask source:** each Lego RGBA PNG's own alpha channel, binarized at
+     `alpha > 127` (foreground/target) vs. `alpha <= 127` (background).
+     Verified against the actual downloaded files
+     (`data/nerf_synthetic/lego/train/*.png`, spot-checked `r_0`, `r_1`,
+     `r_50`, `r_99`): all are RGBA, `uint8`, alpha ranges over the full
+     `[0, 255]`, but a per-image histogram shows alpha is overwhelmingly
+     bimodal at exactly 0 or 255 (e.g. `r_0.png`: 487176 px at 0, 145940 px
+     at 255, out of 640000) with a thin anti-aliased edge band — sampling
+     every 10th training view (10 images), only **1.45%** of pixels have an
+     intermediate alpha value. So the alpha channel is a near-perfect but
+     not exactly binary segmentation mask; a threshold is needed at the
+     silhouette edge, not because the mask is generally ambiguous.
+     `alpha > 127` (standard 8-bit midpoint) was used to binarize it rather
+     than a soft/continuous blend, since hard erasure is specified as a
+     hard-edged operation in `METHODOLOGY.md` §3 (in contrast to soft
+     suppression's explicit blending).
+  2. **Background-proxy method:** Lego has no rendered `background_plate`
+     (no object-toggled-off pass exists for this external dataset). Use a
+     fixed flat proxy color, RGB `(128, 128, 128)` (mid-gray), applied
+     identically to every poisoned pixel in every image/condition — no
+     per-image sampling or hand-picking. Chosen over alternatives because
+     it requires zero per-image judgment (the non-negotiable rule in
+     `CLAUDE.md`) and is visually distinct from both the dataset's
+     white-background compositing convention (`configs/base.yaml`
+     `render.white_background: true`) and the Lego model's own color
+     palette, making the erasure effect unambiguous to eyeball during
+     validation.
+  3. **`V_target` = all 100 `transforms_train.json` training views.**
+     Every Lego training view shows the object (there is only one object
+     in frame, always at least partially visible), so under `METHODOLOGY.md`
+     §2's definition (`V_target` = views where the target's mask exceeds a
+     fixed minimum-area threshold), the threshold is trivially satisfied by
+     every view here. This keeps `D-002`'s target-visible-view definition
+     intact rather than special-casing it away for the PoC.
+  - **Alternatives considered:** (mask) using Blender's object-ID pass
+    instead of alpha — not applicable, these are pre-rendered external PNGs
+    with no accompanying ID pass; (mask) no thresholding, treat alpha as a
+    continuous mask — rejected because hard erasure is defined as a hard
+    replacement, and a continuous blend at 1.45% of pixels would silently
+    turn hard erasure into a mild soft-suppression variant at every edge.
+    (background) sampling each image's own transparent-background fill
+    color — rejected, that fill is arbitrary per-pixel noise under
+    zero-alpha (unpremultiplied), not a meaningful "scene background" to
+    replicate; (background) pure white/black — rejected as visually
+    confusable with the white-background compositing convention (white) or
+    the model's own dark parts (black), which would make erasure harder to
+    visually verify. (`V_target`) restricting to a subset of "best" views —
+    rejected, no such distinction exists for a single-object turntable
+    dataset, and it would be an unjustified per-condition judgment call.
+- **Rationale / evidence:** direct inspection of the downloaded dataset
+  files (channel counts, alpha histograms) rather than assumption, per this
+  step's explicit instruction to confirm rather than assume the alpha
+  channel's behavior.
+- **Reversibility:** trivial to reverse/ignore — these choices are
+  explicitly scoped to the Phase 3 Lego PoC (`condition_id`s
+  `phase3_poc_budget_*`) only. They are **not** the final scene's
+  mask/background-plate protocol; that is a Phase 4 deliverable per
+  `ROADMAP.md` Phase 4 ("render the matching `background_plate` ... and
+  `mask` ... for every training view") and must come from real
+  Blender-rendered plates per `METHODOLOGY.md` §3, not an alpha-channel/
+  flat-color proxy. No existing config, decision, or dataset is
+  overwritten by this entry — `configs/poisoning/budget_20.yaml` (the real
+  condition C3) and `configs/scenes/final_scene.yaml` are untouched.
+
+## D-018 — Phase 3 PoC training: 30,000-iteration budget (does not set Phase 6 precedent)
+
+- **Date:** 2026-09-13
+- **Decision:** train all three Phase 3 PoC conditions
+  (`phase3_poc_budget_00/20/50`) for **30,000 iterations** each, same
+  seed (0), same `lego_sanity.yaml`-derived hyperparameters otherwise
+  (only the training image set differs per condition).
+- **Alternatives considered:** the full 200,000-iteration Phase 2 budget
+  — rejected as disproportionate to Phase 3's ~1-day effort estimate
+  (`ROADMAP.md`) and its explicit non-goal of drawing conclusions from
+  these numbers (3x ~12h runs is a multi-day cost for a mechanism check);
+  a much smaller budget (e.g. 5,000 iterations) — rejected as
+  under-converged even for coarse shape, given `lego_sanity.yaml`'s
+  `precrop_iters: 500` warmup and 500,000-step LR decay schedule (5,000
+  iterations is only 1% into that schedule and well within the
+  precrop-dominated early phase).
+- **Rationale / evidence:** 30,000 iterations is standard "coarse
+  structure visible, fine detail not converged" territory for vanilla
+  NeRF on this dataset (consistent with the qualitative behavior reported
+  for the original NeRF codebase at this stage of training). Using the
+  measured Phase 2 rate (200,000 iterations / 11.91h training-loop time =
+  ~4.66 iter/s on this GPU), 30,000 iterations is a ~1.8h/run estimate,
+  ~5.4h for all three conditions sequentially — proportionate to Phase
+  3's effort budget while still giving each condition tens of thousands
+  of gradient steps to visibly separate a fully-erased-object condition
+  from a clean one. Also aligned to
+  `configs/base.yaml`'s `logging.checkpoint_every: 25000`, so each run
+  gets one interim checkpoint (25,000) plus the final one (30,000).
+- **Reversibility:** trivial — this is a per-run config value
+  (`configs/poisoning/phase3_poc_budget_*.yaml`'s `training.iterations`
+  override), scoped to these three `condition_id`s only. It has no
+  bearing on Phase 6's core-sweep iteration count, which is a separate,
+  not-yet-made decision (that sweep trains on the final scene, not Lego,
+  and needs its own convergence check against that scene's own
+  reference PSNR range, analogous to D-013).

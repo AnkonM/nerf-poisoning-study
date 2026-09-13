@@ -1,0 +1,39 @@
+# Phase 3 pipeline proof-of-concept — Lego, hard erasure, control (0%).
+#
+# NOT one of the main poisoning-conditions matrix entries (METHODOLOGY.md
+# §5, conditions C1-C7) and produces no scientific conclusion — see
+# ROADMAP.md Phase 3's explicit non-goal. Uses scenes/lego_sanity.yaml
+# (Phase 2 pipeline scene), not scenes/final_scene.yaml. Mask/background-
+# proxy/V_target choices below are scoped to this PoC only — see
+# DECISION_LOG.md D-017.
+defaults:
+  - ../base.yaml
+  - ../scenes/lego_sanity.yaml
+
+condition_id: phase3_poc_budget_00
+dataset_source: data/nerf_synthetic/lego  # source Blender Synthetic Lego renders
+output_dir: data/poisoned/phase3_poc_budget_00
+
+poisoning:
+  budget_percent: 0             # percent of V_target, per METHODOLOGY.md §2
+  attack_type: hard_erasure      # only formula implemented in this PoC step
+  view_selection: random
+  seed: 0                          # seeds random view-selection sampling, METHODOLOGY.md §8
+  mask_source: alpha_channel        # D-017: Lego PoC only, not the final-scene protocol
+  mask_alpha_threshold: 127          # alpha > 127 -> target/foreground
+  background_proxy:
+    method: fixed_flat_color          # D-017: no natural background_plate for Lego
+    rgb: [128, 128, 128]                # fixed neutral mid-gray
+  alpha: null                            # unused (only for attack_type: soft_suppression)
+
+# Training overrides for this PoC — see docs/DECISION_LOG.md D-018 for the
+# iteration-count rationale. Reduced from lego_sanity.yaml's inherited
+# 200,000 (Phase 2 full-convergence run); does NOT set precedent for
+# Phase 6's core sweep iteration count.
+dataset:
+  path: data/poisoned/phase3_poc_budget_00  # this condition's dataset dir
+                                             # (train/ poisoned per MANIFEST.csv;
+                                             # val/test symlinked, unchanged, from
+                                             # data/nerf_synthetic/lego)
+training:
+  iterations: 30000

@@ -32,6 +32,14 @@ def main() -> None:
         help="Run identifier; defaults to the config file's basename. "
         "Checkpoints/tensorboard logs go to experiments/runs/<run-id>/.",
     )
+    parser.add_argument(
+        "--skip-final-eval",
+        action="store_true",
+        help="Skip the automatic full-test-set eval at the end of training "
+        "(runs in-process, while training's VRAM allocations are still held — "
+        "see docs/DECISION_LOG.md D-016). Use this plus a separate "
+        "scripts/evaluate.py invocation when training multiple runs back to back.",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -42,7 +50,9 @@ def main() -> None:
     print(f"Git commit: {_git_commit_hash()}")
     print(f"Run dir: {run_dir}")
 
-    summary = train_from_config(cfg, run_dir=run_dir, run_id=run_id)
+    summary = train_from_config(
+        cfg, run_dir=run_dir, run_id=run_id, skip_final_test_eval=args.skip_final_eval
+    )
     summary["config_path"] = args.config
     summary["git_commit"] = _git_commit_hash()
 

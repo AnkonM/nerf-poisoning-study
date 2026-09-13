@@ -567,3 +567,88 @@ not just what it currently looks like.
   not-yet-made decision (that sweep trains on the final scene, not Lego,
   and needs its own convergence check against that scene's own
   reference PSNR range, analogous to D-013).
+
+## D-019 — `skip_final_test_eval` / `--skip-final-eval` added to `src/nerf/training.py` / `scripts/train.py`
+
+- **Date:** 2026-09-13
+- **Decision:** added an opt-in `skip_final_test_eval: bool = False`
+  parameter to `train_from_config` (`src/nerf/training.py`) and a
+  matching `--skip-final-eval` CLI flag to `scripts/train.py`. When set,
+  `train_from_config` skips the full-test-set render it otherwise runs
+  unconditionally right before returning, and returns `test_psnr: None`
+  in its summary dict instead. **Default (flag unset) is unchanged** —
+  the original unconditional full-test-set eval still runs, preserving
+  exact behavioral parity with the Phase 2 run this code was validated
+  against (D-016).
+- **Alternatives considered:** (a) leave `train_from_config` as-is and
+  just also call `scripts/evaluate.py` afterward — rejected, this does
+  **not** avoid the problem: `train_from_config` would still run its own
+  full-test-set eval first, in-process, while the training run's CUDA
+  allocations are still held, before ever returning control to the
+  caller. That in-process eval is exactly the D-016 stall pattern (a
+  cheap operation under full VRAM headroom, but slow/contended right
+  after a long training loop) — D-016 fixed this for the *standalone
+  re-evaluation* use case by adding `scripts/evaluate.py`, but never
+  removed or gated the original in-training auto-eval that caused the
+  problem in the first place, so the same class of run (train
+  immediately followed by needing its test PSNR) was still exposed to
+  it. (b) unconditionally remove the in-training auto-eval — rejected,
+  it's used by existing callers (e.g. anyone re-running the Phase 2
+  config as originally written) and removing it outright would be a
+  silent behavior change to already-validated code, not a scoped
+  addition. (c) make skipping the default — rejected for the same
+  reason; a new run's default behavior should match what was already
+  validated unless a caller opts out.
+- **Rationale / evidence:** built for and used by this step's 3-condition
+  Phase 3 PoC training sweep (`scripts/train.py ... --skip-final-eval`,
+  each run's `test_psnr: null` in `experiments/runs/<run_id>/summary.json`
+  confirms it took effect) specifically to avoid a repeat of D-016's
+  5.5h VRAM-contention stall across three back-to-back runs. This is
+  shared infrastructure (`src/nerf/training.py`, `scripts/train.py`), so
+  it will also be available to Phase 6's core sweep, which trains many
+  more runs back-to-back and has the same exposure.
+- **Reversibility:** trivial — additive, opt-in, default-preserving. No
+  existing config or run is affected unless it explicitly passes the new
+  flag.
+
+## D-020 — Known debt: Phase 3 PoC's poisoned `val`/`test` splits are manually symlinked, not `build_poison_set.py`-generated
+
+- **Date:** 2026-09-13
+- **Decision/finding:** `data/poisoned/phase3_poc_budget_{00,20,50}/val`,
+  `.../test`, `.../transforms_val.json`, and `.../transforms_test.json`
+  are filesystem symlinks pointing at `data/nerf_synthetic/lego`'s
+  original (unmodified) files, created by hand (`ln -s`) during this
+  step's training pass — not produced by `scripts/build_poison_set.py`,
+  which currently only writes `train/` and `transforms_train.json`
+  (per its Step-1 scope: build+validate the poisoned training set, no
+  training yet). `load_blender_data` requires all three splits present
+  under one `dataset.path`, so training needed *something* there; since
+  val/test are never poisoned (`METHODOLOGY.md` only poisons training
+  views), symlinking the unmodified source in was a non-destructive way
+  to unblock training without touching the already-validated `train/`
+  content.
+  - **This is scoped to the Phase 3 Lego PoC only, and is logged here as
+    known debt, not fixed now:** `build_poison_set.py` should be
+    extended to emit a fully self-contained, reproducible-from-config
+    dataset directory (`val`/`test` included, however that's decided to
+    be sourced) as part of Phase 5's poisoning-pipeline build, before
+    it's relied on for the real 8-condition sweep (`METHODOLOGY.md` §5).
+    Relying on manually-created symlinks for that sweep would violate
+    `PROJECT_STRUCTURE.md`'s "a poisoned condition must be fully
+    reproducible by rerunning `build_poison_set.py` against its config
+    alone" rule — the symlinks are outside that script's control and
+    wouldn't be recreated by a fresh run of it.
+- **Alternatives considered:** having `build_poison_set.py` copy (not
+  symlink) val/test at Step-1 time — deferred rather than rejected; a
+  real design question (copy vs. symlink vs. reference-by-path,
+  and how this generalizes to the Phase 4 final scene, which has its own
+  frozen `eval_holdout/` and won't use Lego's val/test at all) that
+  belongs to Phase 5's actual pipeline design, not a decision to make
+  informally while unblocking one PoC training run.
+- **Rationale / evidence:** found and fixed-around (not fixed) while
+  setting up this step's training runs; flagged per this step's
+  instruction to log it as debt rather than solve it now.
+- **Reversibility:** trivial to remove (the symlinks affect nothing
+  outside the three `phase3_poc_budget_*` directories); the underlying
+  gap in `build_poison_set.py` must be closed before Phase 5/6, not
+  reversed.

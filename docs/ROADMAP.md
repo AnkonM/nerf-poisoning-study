@@ -14,7 +14,7 @@ that's the whole point of having gates.
 | 0 — Setup | Complete (local) | PASS locally — RTX 5060/WSL2 matrix-multiply + compute-capability (12, 0) check passes (`scripts/verify_env.py`). **Colab/Kaggle environment parity is unverified** and deferred until the first cloud run (expected Phase 6) — see `environment/SETUP.md` §2.1 and `DECISION_LOG.md` D-009. |
 | 1 — Literature verification | Complete | PASS — novelty claim reconfirmed, no `METHODOLOGY.md` deviation needed. See `DECISION_LOG.md` D-012. |
 | 2 — Lego clean-NeRF sanity check | Complete | PASS — clean-Lego test PSNR 31.550 dB, within the D-013 range (29–33 dB). See `DECISION_LOG.md` D-016 and `experiments/logs/phase2_lego_sanity.md`. |
-| 3 — Poisoning proof of concept (Lego) | Not started | — |
+| 3 — Poisoning proof of concept (Lego) | Complete | PASS — monotonic PSNR degradation with poisoning budget (masked PSNR 23.6→19.4→11.6 dB at 0/20/50% budget), zero pipeline errors across all checks. See `DECISION_LOG.md` D-017–D-020. |
 | 4 — Final scene + eval set | Not started | — |
 | 5 — Poisoning pipeline build | Not started | — |
 | 6 — Minimum poisoning-budget sweep | Not started | — |

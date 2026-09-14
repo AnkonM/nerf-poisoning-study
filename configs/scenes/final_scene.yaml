@@ -245,7 +245,7 @@ render:
   # the Step 4a pilot, not assumed. Hence null here until that pilot reports.
   background_plate:
     method: hide_render
-    mask_dilation_px: null        # Step 4a pilot sets this, with evidence
+    mask_dilation_px: 3          # D-024, set from pilot evidence (see entry)
 
 # ---- V_target visibility threshold --------------------------------------
 # METHODOLOGY.md §2's per-view minimum-visibility constant: the fraction of

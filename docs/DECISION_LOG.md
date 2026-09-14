@@ -1082,3 +1082,96 @@ failure class this project's rules exist to catch (cf. D-011, D-014, D-015):
   data, so they can be changed up until Phase 6 training begins without
   touching the frozen eval set. The rig itself, once Step 6 freezes
   `eval_holdout/`, cannot change.
+
+## D-024 — Phase 4 Step 4a pilot: denoiser bleed cleared, mask dilation set to 3 px
+
+- **Date:** 2026-09-14
+- **Scope:** this entry closes the two questions the Step 4a pilot existed
+  to answer, and is written **before** the full Step 4 batch render, as
+  required. It sets the last unfilled value in
+  `configs/scenes/final_scene.yaml`
+  (`render.background_plate.mask_dilation_px`).
+- **Evidence base:** rather than the planned 2-view pilot, the measurement
+  ran over a **48-pose set** (16 azimuths × elevations 25°/50°/75°) already
+  rendered at production settings (800×800, 128 samples, OptiX denoising,
+  fixed `cycles.seed = 0`, `hide_render` plates) during the Finding-5 check
+  in D-022. More poses for no extra render cost.
+
+### 1. OptiX denoiser bleed: NOT a problem
+
+Measured max `|original − plate|` at more than 150 px from the target mask,
+across all 48 poses: **12/255**, and that residual is real cast shadow, not
+denoiser spill. With an identical `cycles.seed` between a view's original
+and plate render, the denoiser does **not** smear the plate's differing
+light paths across the frame. No mitigation needed; denoising stays ON and
+the sample count stays at 128. (The plan's fallback — disabling denoising
+and raising samples — is not required.)
+
+### 2. Mask dilation: **3 px** (the low end of `METHODOLOGY.md` §3's
+pre-registered 3–5 px candidate range, so this is NOT a deviation)
+
+Two independent measurements set this, and they push in opposite
+directions — which is what makes 3 the answer rather than an arbitrary pick.
+
+**(a) Lower bound — the anti-aliased silhouette fringe.** The ID mask is
+exactly binary, but the *rendered image* is anti-aliased, so silhouette
+pixels are object/background blends. Measuring residual target **chroma**
+(`R − (G+B)/2`, which isolates leftover red object pixels from shadow, a
+luminance-only change) just outside the dilated mask after a hard-erasure
+composite:
+
+| dilation | max residual chroma | mean over poses |
+|---|---|---|
+| 0 px | 93.0 | 65.42 |
+| 1 px | 22.5 | 18.02 |
+| 2 px | 21.0 | 16.51 |
+| 3 px | 21.0 | 15.95 |
+| 5 px | 21.0 | 15.14 |
+| 8 px | 18.0 | 13.85 |
+
+The AA fringe is gone by 1–2 px (93 → 22.5 → 21). **Everything beyond that
+is a plateau that dilation cannot remove**, because it is not an edge
+artifact: residual chroma decays smoothly with distance from the mask
+(mean 4.01 at 3–6 px, 3.50 at 6–12, 2.66 at 12–25, 1.65 at 25–50, 0.82 at
+50–100), which is the signature of **diffuse red colour bleed** — the red
+mug tinting the nearby table via indirect light. Removing the target
+removes that tint. This is the same phenomenon class as D-022 Finding 4
+(shadow retention) and is accepted under the same Option A reasoning: it
+lies outside the mask, so the compositor never writes there.
+
+**(b) Upper bound — the handle hole.** D-022 committed to verifying that
+the handle hole survives dilation. **It does not survive 5 px**, and the
+D-022 estimate ("~34 px hole, ~24 px after 5 px dilation") was wrong: it
+assumed a face-on circular hole, whereas at most poses the handle is
+foreshortened and the hole is a narrow ellipse. Measured over all 48 poses
+(the hole is geometrically visible in 20 of them; at the other 28 the
+handle is edge-on or occluded, which is expected):
+
+| dilation | poses with hole still open | poses where it CLOSES | median hole px |
+|---|---|---|---|
+| 0 px | 20/20 | 0 | 336 |
+| 2 px | 16/20 | 4 | 161 |
+| 3 px | 16/20 | 4 | 92 |
+| 4 px | 14/20 | 6 | 38 |
+| 5 px | 10/20 | **10** | 12 |
+
+At 5 px the hole closes in **half** of the poses where it exists; at 3 px,
+in 4 of 20.
+
+- **Decision: 3 px.** It is the smallest value that fully covers the AA
+  fringe while staying inside the pre-registered range, and it preserves
+  the handle hole in 16/20 poses versus 10/20 at 5 px. Going above 3 px
+  buys nothing measurable (residual chroma is identical at 3 and 5 px)
+  and costs hole fidelity.
+- **Alternatives considered:** 1–2 px — outside `METHODOLOGY.md` §3's
+  pre-registered range, so choosing it would be a protocol deviation
+  requiring its own justification, for a benefit (4 more poses keeping an
+  open hole) that is marginal. 5 px — rejected on the hole evidence above.
+- **Documented residual:** in 4 of 20 poses the 3 px dilation closes the
+  handle hole, meaning a small patch of table seen *through* the handle
+  (30–90 px, under 0.015% of frame) is treated as target and replaced by
+  plate. Recorded so it is not later mistaken for misregistration.
+- **Reversibility:** a single config value with no effect on rendered data
+  — the masks and plates on disk are unchanged by it, since dilation is
+  applied at compositing time (Phase 5), not at render time. It can be
+  revisited up until the first poisoned set is built, without re-rendering.

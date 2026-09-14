@@ -1175,3 +1175,66 @@ in 4 of 20.
   — the masks and plates on disk are unchanged by it, since dilation is
   applied at compositing time (Phase 5), not at render time. It can be
   revisited up until the first poisoned set is built, without re-rendering.
+
+## D-025 — Phase 4 Step 5: batch render complete, |V_target| = 100, gate PASS
+
+- **Date:** 2026-09-14
+- **Batch render:** 360 renders (185 originals + 175 masks + 175 background
+  plates = **535 files**) in **14.6 minutes**, zero errors. This is inside
+  the 25–50 min estimate, and the per-render rate (~2.4 s) matches the
+  Step 0 probe on the default cube — the real scene costs no more than the
+  trivial one at these settings. File counts exact: train 100 / val 10 /
+  eval_holdout 75 originals; masks and plates for train + eval_holdout
+  only (val is monitoring-only, D-021).
+- **`|V_target|` = 100 of 100 training views.** Per-view target mask area
+  over the training set: **min 1.47%, median 1.85%, max 2.18%** of frame,
+  against the threshold of 0.50% locked in D-022 before any of this was
+  computed. **Smallest margin over threshold: 2.95×.**
+  Every training view clears it, which is the intended structural outcome
+  of placing a moderately-sized target centrally and aiming every rig pose
+  at it — not a coincidence, and not the result of tuning the threshold.
+  Recorded in `data/blender_scenes/cameras.json` under `v_target`
+  (count, per-view area fractions for both train and eval_holdout, and the
+  threshold), per `METHODOLOGY.md` §2's requirement that it live there and
+  never be recomputed mid-study.
+
+### Phase 4 gate (ROADMAP.md): **PASS**
+
+| check | result |
+|---|---|
+| target separable from background by mask | **PASS** — all 175 masks binary (uint16, exactly {0, 65535}), none empty, none full-frame |
+| `round(0.05 × \|V_target\|) ≥ 1` | **PASS** — equals **5** |
+| ...and lands on several views, not exactly 1 | **PASS** — 5, per the brief's requirement |
+| all validation checks clean | **PASS** — zero errors across 185 views |
+
+Resulting budget ladder (`METHODOLOGY.md` §5), all whole numbers with no
+awkward rounding: 5% → 5 views, 10% → 10, 20% → 20, 30% → 30, 50% → 50.
+
+### Validation detail
+
+- **Mask bit depth asserted, not assumed** — all masks `uint16` with
+  exactly two unique values. The reader raises on any other dtype or on a
+  non-binary mask (D-024's concern about inheriting D-017's uint8 `>127`).
+- **Far-field original-vs-plate agreement: max 13/255** (worst view
+  `eval_holdout/r_065`), against a bound of 20. This is the check that
+  replaced Phase 3's strict outside-mask pixel identity, which is **not**
+  valid under `hide_render` plates: the target's shadow and colour bleed
+  legitimately differ outside the mask (D-022 Finding 4, D-024). Far-field
+  agreement is what actually proves the fixed `cycles.seed` is holding and
+  that the two renders of a view are registered to each other.
+- **Handle hole under the locked 3 px dilation:** open in 68 views, closed
+  in 23 (of the 91 views where the hole is geometrically visible at all).
+  Consistent with D-024's 48-pose sample and well better than the 5 px
+  behaviour that ruled out the top of the range.
+- **Loader round-trip on the real scene:** `load_blender_data` returns
+  `(185, 400, 400, 4)` float32 RGBA at `half_res`, split counts exactly
+  **100 / 10 / 75**, focal **555.556** — matching the value derived
+  independently from the 50 mm lens / 36 mm sensor / 800 px geometry
+  (`0.5·800/tan(0.5·camera_angle_x)/2`) to three decimals. The alpha
+  channel is present and fully opaque, so the loader's white-background
+  composite is the no-op predicted in D-021.
+- **Reversibility:** none of this is a design decision — it is the measured
+  outcome of the choices locked in D-022/D-023/D-024. `|V_target|` must not
+  be recomputed after this point (`METHODOLOGY.md` §2); if the scene or rig
+  ever changed, every downstream budget number would change with it, which
+  is precisely what the Step 6 freeze exists to prevent.

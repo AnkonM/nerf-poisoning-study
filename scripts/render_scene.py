@@ -47,6 +47,10 @@ def main() -> int:
                         help="render only the first N poses (pilot runs)")
     parser.add_argument("--splits", default=None,
                         help="comma-separated subset, e.g. train,eval_holdout")
+    parser.add_argument("--data-root", default=None,
+                        help="write under this data root instead of ./data "
+                             "(used by the closeout reproducibility check, so a "
+                             "rebuild cannot touch the frozen eval set)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -69,7 +73,8 @@ def main() -> int:
                to_windows_path(blend),
                "--python", to_windows_path(RENDERER), "--",
                to_windows_path(spec_path), to_windows_path(cameras),
-               to_windows_path(os.path.join(REPO_ROOT, "data"))]
+               to_windows_path(args.data_root
+                               or os.path.join(REPO_ROOT, "data"))]
         if args.limit:
             cmd += ["--limit", str(args.limit)]
         if args.splits:

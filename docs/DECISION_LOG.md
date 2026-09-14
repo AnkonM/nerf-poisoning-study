@@ -1321,3 +1321,63 @@ the attempts, the set still contains its 75 held-out views and
   `README.md`'s ground rules, would mean the experiment must be rerun. If a
   defect is ever found in the eval set, the correct response is to document
   it and restart the affected phases — not to quietly regenerate the data.
+
+## D-027 — Phase 4 closeout: end-to-end reproducibility verified; renders are NOT bit-exact
+
+- **Date:** 2026-09-14
+- **What was done:** the closeout reproducibility check was **actually
+  executed**, not asserted. From the committed config alone, into a scratch
+  data root (so it could not touch the frozen set): rebuilt the `.blend`,
+  regenerated the camera rig, re-rendered all 360 images, then compared
+  against the frozen manifest and re-ran the gate.
+
+### Result: reproducible in every number that matters, but NOT byte-for-byte
+
+| artifact | result |
+|---|---|
+| `.blend` rebuild | PASS |
+| camera rig | PASS — 185 poses, train 100 / val 10 / eval_holdout 75 |
+| `transforms_test.json` | **byte-identical** |
+| masks (75 held-out) | **pixel-identical** — max abs diff **0** |
+| originals (75 held-out) | **NOT identical** — max abs diff **1/255**, on 0.0028% of pixels |
+| background plates (75) | **NOT identical** — max abs diff **1/255**, on 0.0028% of pixels |
+| SHA-256 manifest vs regenerated copy | **FAIL — 225 of 226 files differ** |
+| loader round-trip on regenerated copy | PASS — 100/10/75, focal 555.556 |
+| recomputed `\|V_target\|` | **PASS — 100, margin 2.95x, gate PASS. Identical to the frozen value.** |
+
+- **The plan's stated success criterion — "the checksum manifest reproduces
+  byte-for-byte" — is FALSE and is corrected here.** Cycles + OptiX path
+  tracing with GPU denoising is not bit-deterministic across runs:
+  floating-point reduction order across parallel threads varies, so a
+  re-render lands within one 8-bit quantisation step on a small fraction of
+  pixels. A fixed `cycles.seed` fixes the *sample pattern*, not the
+  *summation order*. This was assumed rather than checked when the plan was
+  written; running it is what exposed it.
+
+- **Magnitude, in context:** ~18 pixels of 640,000 per image differ, each by
+  exactly 1/255. That is below the quantisation floor of the stored 8-bit
+  PNGs and orders of magnitude below any PSNR/SSIM/LPIPS difference this
+  study reports (Phase 3's effect sizes were measured in whole dB).
+
+- **What this does and does not mean:**
+  - It does **not** weaken the freeze. `scripts/freeze_eval_set.py --verify`
+    against the actual frozen data still reports byte-for-byte identity —
+    the manifest's real job is detecting modification or corruption of the
+    frozen copy, and it does that exactly.
+  - It does **strengthen** the case for freezing rather than regenerating:
+    since a re-render is not bit-identical, the frozen set is the single
+    authoritative artifact and must never be regenerated, which is already
+    `METHODOLOGY.md` §4's rule. Had this study relied on "just re-render it
+    if needed", every regeneration would have silently shifted the
+    evaluation data underneath the results.
+  - Everything the paper actually reports as a number reproduces **exactly**:
+    `|V_target|`, the per-view mask areas, the mask pixels themselves, the
+    camera poses, and the gate outcome.
+
+- **Honest claim for the write-up:** the pipeline is reproducible from a
+  config file + a git commit hash to within **±1/255 per pixel on ~0.003% of
+  pixels** for RGB renders, and **exactly** for poses, masks and every
+  derived quantity. It is not bit-exact, and should not be described as such.
+- **Reversibility:** n/a — a measured property of the toolchain, not a
+  decision. Revisit only if Blender/OptiX ever guarantees bit-exact output,
+  which would allow tightening the claim.

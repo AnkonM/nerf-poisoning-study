@@ -17,9 +17,16 @@ Freezing only the images would leave the masks, plates and poses that every
 held-out metric is computed against mutable — which would defeat the point of
 the rule while appearing to satisfy it.
 
+IMPORTANT (D-027): --verify is for checking that the FROZEN COPY is unmodified.
+It is NOT a reproducibility test. Cycles + OptiX is not bit-deterministic, so a
+re-rendered copy differs by 1/255 on ~0.003% of pixels and will always FAIL this
+check even though the scene, poses, masks and every derived number reproduce
+exactly. Do not "fix" a failing --root comparison by re-freezing.
+
 Usage:
     python scripts/freeze_eval_set.py --freeze
-    python scripts/freeze_eval_set.py --verify [--root OTHER_DATA_ROOT]
+    python scripts/freeze_eval_set.py --verify              # check the frozen copy
+    python scripts/freeze_eval_set.py --verify --root DIR   # see caveat above
 """
 
 import argparse

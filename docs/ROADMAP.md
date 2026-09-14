@@ -15,7 +15,7 @@ that's the whole point of having gates.
 | 1 — Literature verification | Complete | PASS — novelty claim reconfirmed, no `METHODOLOGY.md` deviation needed. See `DECISION_LOG.md` D-012. |
 | 2 — Lego clean-NeRF sanity check | Complete | PASS — clean-Lego test PSNR 31.550 dB, within the D-013 range (29–33 dB). See `DECISION_LOG.md` D-016 and `experiments/logs/phase2_lego_sanity.md`. |
 | 3 — Poisoning proof of concept (Lego) | Complete | PASS — monotonic PSNR degradation with poisoning budget (masked PSNR 23.6→19.4→11.6 dB at 0/20/50% budget), zero pipeline errors across all checks. See `DECISION_LOG.md` D-017–D-020. |
-| 4 — Final scene + eval set | Not started | — |
+| 4 — Final scene + eval set | Complete | PASS — `\|V_target\|` = 100/100 training views (mask area 1.47–2.18% of frame vs the 0.5% threshold locked before measurement; smallest margin 2.95x), so 5% → 5 poisoned views; eval set frozen read-only, 226 files, aggregate SHA-256 `211a5a59…5ab214`; `METHODOLOGY.md` frozen 2026-09-14. See `DECISION_LOG.md` D-021–D-026. |
 | 5 — Poisoning pipeline build | Not started | — |
 | 6 — Minimum poisoning-budget sweep | Not started | — |
 | 7 — Ablation (random vs strategic) | Not started | — |
@@ -166,22 +166,23 @@ numbers — this phase exists to kill bugs, not to produce results.
 come from.
 
 **Tasks:**
-- [ ] Build the custom multi-object Blender scene with a clear, distinct
-  target object embedded in a larger environment (decision + rationale
-  already in `DECISION_LOG.md` D-003 — custom scene over adapted real
-  dataset, to keep mask-annotation cost near zero).
-- [ ] Render the full training-view set with camera poses.
-- [ ] For every training view: render the matching `background_plate`
-  (target toggled off) and `mask` (object-ID pass) — see `METHODOLOGY.md` §3.
-- [ ] Render the held-out evaluation-view set (disjoint camera poses).
-- [ ] Compute and record `|V_target|` (count of training views where the
-  target mask exceeds the minimum-visibility threshold, per
-  `METHODOLOGY.md` §2) — this number gates every later poisoning-budget
-  calculation.
-- [ ] **Freeze** `data/blender_scenes/eval_holdout/` — set read-only,
-  checksum it, record the checksum in `DECISION_LOG.md`.
-- [ ] Freeze `METHODOLOGY.md` (remove the "status: not frozen" note, add a
-  frozen-date entry to `DECISION_LOG.md`).
+- [x] Build the custom multi-object Blender scene — built *procedurally*
+  from `configs/scenes/final_scene.yaml` via `scripts/build_scene.py`, not
+  hand-modelled, so it is regenerable from config + commit (D-022).
+- [x] Render the full training-view set with camera poses (100 train poses).
+- [x] For every training view: matching `background_plate` and `mask`. Two
+  real Cycles renders per view — the mask comes free from the same render
+  as the original via the Object Index pass (D-022, D-025).
+- [x] Render the held-out evaluation-view set (75 poses, disjoint by
+  construction — all pools cut from one lattice, D-023).
+- [x] Compute and record `|V_target|` = **100/100** training views, into
+  `data/blender_scenes/cameras.json` (D-025).
+- [x] **Freeze** the held-out set — read-only, checksummed, aggregate
+  SHA-256 in `DECISION_LOG.md` D-026. Scope widened beyond this line's
+  literal wording to include the holdout masks, plates and
+  `transforms_test.json`, since every held-out metric is computed against
+  those too.
+- [x] Freeze `METHODOLOGY.md` (status now "FROZEN 2026-09-14"; D-026).
 
 **Gate:** scene has a clearly identifiable target object separable from
 background by mask; `|V_target|` is large enough that even the 5% condition

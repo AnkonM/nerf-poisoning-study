@@ -1238,3 +1238,86 @@ awkward rounding: 5% → 5 views, 10% → 10, 20% → 20, 30% → 30, 50% → 50
   be recomputed after this point (`METHODOLOGY.md` §2); if the scene or rig
   ever changed, every downstream budget number would change with it, which
   is precisely what the Step 6 freeze exists to prevent.
+
+## D-026 — Phase 4 Step 6: held-out evaluation set FROZEN; METHODOLOGY.md frozen
+
+- **Date:** 2026-09-14
+- **Decision:** the held-out evaluation set is frozen and `METHODOLOGY.md` is
+  locked. **This is the point of no return for Phase 4.** It was done only
+  after the Step 5 gate returned a genuine PASS on all four checks (D-025),
+  not on a "mostly worked".
+
+### What is frozen — deliberately wider than ROADMAP.md's literal wording
+
+`ROADMAP.md` Phase 4 says "freeze `data/blender_scenes/eval_holdout/`".
+Taken literally that would freeze the held-out *images* while leaving
+mutable the masks, plates and poses that every held-out metric is actually
+computed against — satisfying the rule's letter while defeating its
+purpose. Frozen set is therefore:
+
+| path | why it must be frozen |
+|---|---|
+| `data/blender_scenes/eval_holdout/` | the held-out rendered views |
+| `data/masks/eval_holdout/` | `METHODOLOGY.md` §6's **masked** metrics are computed with these |
+| `data/background_plates/eval_holdout/` | §6's secondary plate-distance metric is computed against these |
+| `data/blender_scenes/transforms_test.json` | the camera poses that *define* the held-out set |
+
+**226 files total.**
+
+### Checksums
+
+- **Aggregate SHA-256:
+  `211a5a59d85cf29447a7608e74bbe49ebe08717709d3c520bc3af549d65ab214`**
+- Per-file manifest: `data/blender_scenes/eval_holdout_SHA256SUMS.txt`
+  (tracked in git, so the checksums live in version control rather than only
+  alongside the data they describe).
+- Re-checkable at any time with
+  `python scripts/freeze_eval_set.py --verify`, which reports missing,
+  unexpected and changed files as well as the aggregate.
+- `scripts/freeze_eval_set.py --freeze` **refuses to run if the manifest
+  already exists**, so the freeze cannot be silently re-taken over modified
+  data at a later date — re-freezing would otherwise produce a fresh,
+  self-consistent checksum that hid the change.
+
+### Write protection — verified by attempting writes, not asserted
+
+All frozen files are mode `r--r--r--` and the frozen directories are
+`dr-xr-xr-x`. Five write attempts were made and **all five failed**:
+
+| attempt | result |
+|---|---|
+| append to a held-out view | blocked (Permission denied) |
+| append to a held-out mask | blocked (Permission denied) |
+| append to `transforms_test.json` | blocked (Permission denied) |
+| create a new file inside the frozen directory | blocked |
+| delete a held-out view | blocked |
+
+The directories are made read-only as well as the files specifically so
+that **deletion** is blocked: POSIX delete permission comes from the parent
+directory, so read-only files alone would still have allowed `rm`. After
+the attempts, the set still contains its 75 held-out views and
+`--verify` reports byte-for-byte identity.
+
+### METHODOLOGY.md frozen
+
+- Status line changed from "to be frozen at the end of Phase 4" to
+  **"FROZEN 2026-09-14"**, carrying the aggregate checksum of the eval set
+  it is measured against.
+- §10's deviation log now reads "none — followed exactly", with an explicit
+  note that the §3 "Scope of the edit" paragraph is **not** a deviation: it
+  was added pre-freeze during Step 2 and states a property the §3 formulas
+  always had, without changing the formulas.
+- Two values that were still written as *candidates* were replaced with the
+  decided values before freezing, so the frozen protocol is unambiguous:
+  the mask dilation (**3 px**, D-024) and the minimum-visibility threshold
+  and resulting count (**0.005**, **`|V_target|` = 100**, D-022/D-025).
+  Leaving a frozen protocol reading "candidate 3–5 px" would have left a
+  free parameter inside a document whose entire purpose is to have none.
+- **From this date, any change to §1–§7 requires both a `DECISION_LOG.md`
+  entry and a line in §10's deviation log.**
+
+- **Reversibility: none, by design.** Unfreezing and re-rendering the
+  held-out set would invalidate every metric computed against it and, per
+  `README.md`'s ground rules, would mean the experiment must be rerun. If a
+  defect is ever found in the eval set, the correct response is to document
+  it and restart the affected phases — not to quietly regenerate the data.

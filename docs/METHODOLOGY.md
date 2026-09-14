@@ -1,12 +1,18 @@
 # Methodology (Locked Protocol)
 
-**Status: to be frozen at the end of Phase 4 (final scene built, eval set
-rendered).** Before that point this document may change freely as decisions
-firm up. After that point, any change requires a dated entry in
-`DECISION_LOG.md` explaining what changed and why — silent changes here are
-how "the poisoning-budget curve" quietly turns into "whatever curve happened
-to look good," and that's exactly the failure mode this document exists to
-prevent.
+**Status: FROZEN 2026-09-14** (end of Phase 4 — final scene built, eval set
+rendered, checksummed and set read-only; see `DECISION_LOG.md` D-026).
+From this date, any change to §1–§7 requires a dated entry in
+`DECISION_LOG.md` explaining what changed and why, **and** a corresponding
+line in §10's deviation log below — silent changes here are how "the
+poisoning-budget curve" quietly turns into "whatever curve happened to look
+good," and that's exactly the failure mode this document exists to prevent.
+
+The frozen held-out evaluation set this protocol is measured against has
+aggregate SHA-256
+`211a5a59d85cf29447a7608e74bbe49ebe08717709d3c520bc3af549d65ab214`
+(226 files; manifest at `data/blender_scenes/eval_holdout_SHA256SUMS.txt`,
+re-checkable with `python scripts/freeze_eval_set.py --verify`).
 
 This document exists because the single biggest threat to this project's
 credibility is not weak results — negative or moderate results are fine and
@@ -54,6 +60,13 @@ poisoned_views = sample(V_target, num_poisoned)   # method fixed per condition, 
 `data/blender_scenes/cameras.json` metadata once the final scene is built and
 are never recomputed mid-study.
 
+**Frozen values for this study:** minimum-visibility threshold **0.005**
+(0.5% of frame pixels), locked before the count was computed; **`|V_target|`
+= 100** of 100 training views (per-view target mask area 1.47%–2.18% of
+frame, smallest margin 2.95x over threshold). The resulting budget ladder is
+5% → 5 views, 10% → 10, 20% → 20, 30% → 30, 50% → 50. See `DECISION_LOG.md`
+D-022 (threshold) and D-025 (measured count).
+
 ## 3. Attack conditions
 
 Two poisoning mechanisms, applied by a single deterministic script
@@ -79,7 +92,12 @@ poisoned_pixel = mask * (alpha * original + (1 - alpha) * background_plate) + (1
   image or per budget level. Intensity-as-a-variable is an explicitly
   out-of-scope future ablation (§9).
 - Mask source is identical for every view: raw Blender object-ID mask, one
-  fixed dilation amount decided once (candidate 3–5px) and applied uniformly.
+  fixed dilation amount decided once and applied uniformly. **Decided value:
+  3 px** (`render.background_plate.mask_dilation_px` in
+  `configs/scenes/final_scene.yaml`), set from the Step 4a pilot's evidence
+  before any poisoned set was built — see `DECISION_LOG.md` D-024. The
+  Blender object-ID mask is exactly binary (no anti-aliased edge band), so
+  no per-pixel binarisation threshold is needed or used.
 - Both formulas are implemented as pure pixel arithmetic on three
   Blender-rendered, pose-aligned images (`original`, `background_plate`,
   `mask`) — no inpainting, no generative fill, for the synthetic scene.
@@ -180,4 +198,10 @@ Any change to §1–§7 after this document is frozen must be logged here with a
 date and a link to the corresponding `DECISION_LOG.md` entry. If this section
 is empty, the protocol as originally frozen was followed exactly.
 
-*(none yet — document not frozen)*
+*(none — the protocol as frozen on 2026-09-14 has been followed exactly.)*
+
+Note: the §3 "Scope of the edit" paragraph (shadow / ambient-occlusion /
+colour-bleed retention under mask-limited erasure) is **not** a deviation. It
+was added before the freeze, during Phase 4 Step 2, to state explicitly a
+property the §3 formulas always had; the formulas themselves are unchanged.
+See `DECISION_LOG.md` D-022 Finding 4 and D-024.

@@ -799,3 +799,217 @@ not just what it currently looks like.
   dropping the separate val pool afterward would mean either regenerating
   the train pool or accepting contaminated monitoring — so it is settled
   now, before any render, deliberately.
+
+## D-022 — Phase 4 Step 2: final scene locked; background-plate method; shadow behaviour of mask-limited erasure
+
+- **Date:** 2026-09-14
+- **Status:** these are the **locked** scene choices, recorded after the
+  Step 2 human preview review passed (`ROADMAP.md` Phase 4). Everything
+  below is defined in `configs/scenes/final_scene.yaml` and built by
+  `scripts/build_scene.py` → `src/data_pipeline/blender_build_scene.py`;
+  nothing here is hardcoded in a `.py` file, and
+  `data/raw/tabletop_diorama.blend` is a regenerable build artifact, not a
+  hand-modelled asset (README.md's reproducibility ground rule, which is
+  why the scene brief mandated a procedural build over GUI modelling).
+
+### Decision 1 — locked scene content
+
+Tabletop diorama, all objects opaque diffuse Principled BSDF (metallic 0,
+transmission 0 — the brief forbids glass/mirror/metal because they break
+object-ID mask cleanliness and make soft suppression ambiguous):
+
+| Role | Shape | Colour | Placement |
+|---|---|---|---|
+| **Target** `Target_Mug` | tapered cylinder body (r 0.105→0.120, h 0.260) + torus handle (major 0.075, minor 0.030) | red | origin, `pass_index = 1` |
+| `Distractor_Book` | box 0.22×0.16×0.06, 15° | blue | ring r 0.70, 40° |
+| `Distractor_Ball` | sphere r 0.110 | green | ring r 0.70, 130° |
+| `Distractor_Cone` | cone r 0.130, h 0.260 | yellow | ring r 0.70, 215° |
+| `Distractor_Ring` | torus (major 0.100, minor 0.035) lying flat | tan | ring r 0.70, 310° |
+
+Table: disc r 6.0, albedo 0.34. Backdrop: open-topped cylinder r 5.0,
+h 4.0, albedo 0.52. Key light: area, size 1.4, **90 W**, at
+(1.60, −1.30, 2.60). World ambient strength 0.12. Camera: 50 mm lens /
+36 mm sensor (39.6° FOV), **radius 2.9 m**, elevation 25°–75°.
+
+Three choices here are derived rather than picked, and are recorded so a
+later reader does not "simplify" them back into a broken state:
+
+1. **Camera radius 2.9 m, not 4.0 m.** At 4.0 m the target subtends only
+   ~0.76% of frame area — *below* the visibility threshold in Decision 3,
+   which would have made `V_target` collapse. 2.9 m is the closest radius
+   that still frames the full 1.70 m diorama.
+2. **Handle tube thickness (minor_radius 0.030) is forced, not aesthetic.**
+   With `body_r` = body radius at handle height, `overlap = body_r −
+   (offset − major − minor)` and `hole_gap = (offset − major + minor) −
+   body_r`, so **`overlap + hole_gap ≡ 2 × minor_radius`**. Both must be
+   adequate: too little overlap and the handle renders as a detached
+   floating ring; too little hole_gap and the hole is buried inside the
+   body and there is no handle hole at all. No choice of `major_radius` or
+   `offset` can rescue a thin tube. At minor 0.030 with
+   `offset = major + body_r`, both are 0.030 m (~11 px), so the hole
+   (diameter ~34 px) survives `METHODOLOGY.md` §3's 3–5 px dilation.
+3. **Backdrop albedo 0.52, not 0.72.** The backdrop encloses the scene, so
+   a bright value turns it into a giant softbox whose interreflection
+   erases the key light's contact shadows entirely.
+
+- **`Distractor_Can` (cylinder) was replaced by `Distractor_Ring` (torus)**
+  during this review: a cylinder is silhouette-identical to the target's
+  mug body, so from poses where the handle is occluded or foreshortened
+  the two differed only in hue. The scene brief requires the target be
+  visually/semantically distinct from the distractors; a flat-lying torus
+  is unambiguous from every pose in the rig.
+
+### Decision 2 — background-plate method: `hide_render`
+
+The plate is rendered with the target's **`hide_render = True`** (removed
+from camera rays, shadow rays and indirect/AO bounces), *not* with
+camera-visibility-only toggling. A camera-visibility plate leaves the
+target's cast shadow and contact AO on the table with no object above
+them, which is a compositing artifact rather than ground truth: a plate is
+supposed to represent the scene as if the target had never been there
+(D-003).
+
+### Decision 3 — thresholds (locked BEFORE `V_target` is computed)
+
+- **Per-pixel mask binarisation:** not a tunable. Blender's ID Mask pass
+  with anti-aliasing off is **exactly binary** — measured on real preview
+  masks, exactly 2 unique values and no intermediate edge band at all.
+  This is strictly better than D-017's Lego alpha proxy, which had 1.45%
+  intermediate-alpha pixels and needed a real threshold decision.
+- **Per-view minimum visibility (`METHODOLOGY.md` §2):**
+  **0.005 (0.5% of frame pixels = 3,200 px of 640,000).**
+  Measured target area across the rig extremes is **1.62%–2.35%**, i.e. a
+  **3.2×–4.7× margin** — structural, not marginal. A 1.0% candidate was
+  **rejected** because the same geometry would clear it by only ~1.4×,
+  leaving `V_target` sensitive to per-pose foreshortening. Locked now, in
+  config, before `V_target` is computed, and never tuned afterwards (the
+  D-013 discipline).
+
+### Finding 4 — shadows survive erasure; this is mask-limited compositing, not a defect
+
+**This is the substantive methodological finding of Step 2 and the reason
+Decision 2 alone is not sufficient.** Recorded in full so it is not
+rediscovered as a surprise during Phase 8 write-up.
+
+`METHODOLOGY.md` §3's formulas read the plate **only inside the mask**:
+
+```
+poisoned = mask * background_plate + (1 - mask) * original
+```
+
+The target's cast shadow falls on the table **outside** the target's
+silhouette, therefore outside the mask, therefore the poisoned pixel there
+is taken from `original` and the shadow is retained **regardless of which
+plate method is used**. Switching the plate to `hide_render` changes only
+pixels *inside* the silhouette; it cannot remove a shadow lying outside
+it. So "object gone, shadow remains" is a property of **mask-limited
+compositing**, not of the plate's content.
+
+Measured (preview triple, az 60° / el 40°): the original-vs-plate
+difference region is ~3.7% of frame — **larger than the 2.1% target
+itself** — and it does not decay with dilation (3.74% of outside-mask
+pixels differ at 0 px dilation, still 1.67% at 45 px, max magnitude 82/255).
+Dilation is structurally the wrong instrument: the difference is a cast
+shadow stretching away across the table, not a rim around the silhouette.
+
+- **Decision: Option A — `METHODOLOGY.md` §3 is kept EXACTLY as written.**
+  No deviation-log entry is required, because nothing in §3 changes.
+- **Why this does not affect either metric category as currently defined:**
+  the primary metrics (§6) are *masked* PSNR/SSIM/LPIPS inside the target
+  region and *unmasked* metrics over the rest of the frame, both computed
+  against the **true clean render**. The shadow is present in the clean
+  render and present in the poisoned training images alike, so it is
+  simply consistent scene content that the model is expected to
+  reconstruct; it is not an error signal in the masked (suppression)
+  region, and in the unmasked (collateral) region it is identical between
+  control and poisoned conditions, so it cannot inflate or deflate the
+  collateral-damage curve. The secondary plate-distance metric is computed
+  in the target region only, which is exactly where the plate *is* used.
+- **What it does mean scientifically:** hard erasure leaves a residual
+  cue — the object is gone but its shadow is not. This is an honest and
+  realistic limitation of any mask-limited attack (a real attacker
+  inpainting a masked region faces the same constraint), and should be
+  reported as such rather than engineered away.
+- **Alternatives considered:** (b) redefining the mask as the union of the
+  object-ID mask and the shadow-difference region — rejected for the core
+  study: it would change §3's "raw Blender object-ID mask" definition
+  after the protocol was written, converting a pre-registered choice into
+  a post-hoc one, and it would make the attack strictly stronger than the
+  one specified. (c) lighting the scene to suppress shadows — rejected:
+  contact shadows were added deliberately, they are needed for the plate
+  method to be meaningful at all, and a shadowless scene gives the NeRF
+  less geometric grounding.
+- **Required follow-up before Step 6's freeze:** add a short clarifying
+  note to `METHODOLOGY.md` §3 (or §9) stating that shadow retention under
+  mask-limited erasure is a known, expected property of the specified
+  formulas and not a pipeline defect — so that it reads as pre-registered
+  rather than discovered after the fact.
+
+### Finding 5 — the target's shadow does touch distractors, negligibly
+
+Checked explicitly before locking, over a **48-pose sample** (16 azimuths
+× elevations 25°/50°/75°) at production settings, by giving all
+distractors a shared `pass_index = 2` so one ID Mask yields their combined
+footprint, then testing which pixels *belonging to a distractor* change
+between the original and the `hide_render` plate.
+
+**Answer: yes, but negligible.**
+
+| difference magnitude | total px across all 48 poses | poses affected |
+|---|---|---|
+| > 8 / 255 (faint indirect bounce) | 2,651 | 42 / 48 |
+| > 20 / 255 | 178 | 8 / 48 |
+| > 30 / 255 (genuine shadow contact) | 118 | 8 / 48 |
+| > 50 / 255 | 43 | 5 / 48 |
+
+Worst single pose (az 112°, el 25°): 125 crossing pixels = **0.56% of the
+visible distractor area** and **0.025% of the frame**, max magnitude
+68/255. So the near-ubiquitous case (42/48 poses) is faint indirect colour
+bleed at ~10/255, and true shadow contact occurs in 8 of 48 poses totalling
+118 px across the entire sample.
+
+Documented rather than treated as blocking, for the same reason as
+Finding 4: these pixels lie outside the target mask, so the compositor
+never writes to them and poisoned images are unaffected. It is recorded so
+that a later observer comparing a plate against its original does not
+mistake this for misregistration.
+
+### Decision 6 — two settings promoted into config, one constraint on Step 4
+
+- **View transform `Standard`** (not AgX/Filmic) is now
+  `render.view_transform` in `configs/scenes/final_scene.yaml` and applied
+  by the build script, rather than living only in a preview script. It
+  changes every pixel of every training image and every metric computed
+  from one, so it belongs in the config per `PROJECT_STRUCTURE.md`.
+- **Masks are 16-bit BW PNG** (values 0 and 65535), recorded as
+  `render.mask_color_depth`. **Step 4's binarisation code must assert the
+  bit depth and threshold at half of the dtype max.** D-017's Lego
+  `alpha > 127` assumes uint8 and would silently classify *every* pixel of
+  a 16-bit mask as foreground — a failure that produces a plausible-looking
+  full-frame mask rather than an error.
+
+### Three bugs found and fixed during Step 1/2
+
+Logged because each failed silently rather than raising, which is the
+failure class this project's rules exist to catch (cf. D-011, D-014, D-015):
+
+1. **Key light aimed upward.** The hand-rolled Euler aim used
+   `acos(dz/r)` where aiming at the origin requires `acos(-dz/r)` — 141.6°
+   instead of 38.4°. Every render was lit purely by world ambient and
+   backdrop bounce. It presented as "flat, shadowless lighting" and barely
+   responded to energy changes (900 → 9000 W), which is what exposed it.
+   Replaced with `Vector.to_track_quat('-Z','Y')`. **The correct energy is
+   ~10× lower (90 W) than the drafts that were unknowingly compensating
+   for it** — anyone reading the config's small energy value should not
+   "correct" it upward.
+2. **Blanket `shade_smooth`** on every object rounded the cone tip,
+   cylinder caps and box edges into blobs. Replaced with angle-based
+   `shade_auto_smooth`.
+3. **Handle buried inside the body** — see Decision 1, item 2.
+
+- **Reversibility:** the scene is regenerable from config + commit at any
+  time, so pre-freeze changes are cheap. After Step 6 freezes
+  `data/blender_scenes/eval_holdout/`, changing scene content would
+  invalidate the eval set and every downstream result — so these choices
+  are locked here, deliberately, before the rig and batch render are
+  built on top of them.

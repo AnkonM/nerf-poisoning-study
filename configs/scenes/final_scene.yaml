@@ -1,0 +1,259 @@
+# Phase 4 main-study scene — "tabletop diorama".
+#
+# Single source of truth for the scene's geometry, materials, lighting and
+# render settings, per docs/PROJECT_STRUCTURE.md ("configs/ is the only
+# place hyperparameters and condition definitions live"). scripts/build_scene.py
+# reads this file and produces data/raw/final_scene.blend; nothing about the
+# scene is hardcoded in a .py file.
+#
+# STATUS: Step 1 (scene geometry) — object/material/placement values below are
+# PROPOSED and are locked only after the Step 2 human preview review, at which
+# point they are recorded in DECISION_LOG.md. The camera.rig pose counts and
+# selection seed are a Step 3 deliverable and are marked TBD below.
+#
+# All lengths in meters. World origin is the center of the table, with the
+# target object sitting on it.
+
+defaults:
+  - ../base.yaml
+
+scene:
+  name: tabletop_diorama
+
+  # ---- target object -------------------------------------------------
+  # A red mug: tapered cylinder body + torus handle. Chosen per the scene
+  # brief for a simple, solid, legible silhouette with no fine perforated
+  # detail, no thin/wireframe geometry, and an opaque diffuse material.
+  # pass_index 1 is what the compositor's ID Mask node keys on to produce
+  # the mask; every other object is pass_index 0.
+  target:
+    name: Target_Mug
+    pass_index: 1
+    color: [0.75, 0.10, 0.08]     # red — distinct from every distractor hue
+    roughness: 0.6
+    location: [0.0, 0.0, 0.0]     # base sits on the table plane
+    body:
+      radius_bottom: 0.105
+      radius_top: 0.120           # slight upward taper, reads as a mug not a can
+      height: 0.260
+      vertices: 64                # smooth silhouette without being heavy
+    handle:
+      # Handle geometry is SOLVED, not chosen freely. Two things must both
+      # hold, with body_r = body radius at handle height (~0.113):
+      #   overlap  = body_r - (offset_x - major - minor)   [handle must fuse
+      #              into the body, or it renders as a detached floating ring]
+      #   hole_gap = (offset_x - major + minor) - body_r   [the hole must clear
+      #              the body, or there is no visible hole at all]
+      # Adding these: overlap + hole_gap == 2 * minor_radius. So BOTH can only
+      # be adequate if the tube is thick enough — no choice of major_radius or
+      # offset can rescue a thin tube. Two earlier attempts each failed one
+      # side of this: minor 0.022 / offset 0.150 buried the hole, and
+      # minor 0.022 / offset 0.205 left only ~3 px of overlap, so the handle
+      # visibly floated.
+      # With minor 0.030 and offset = major + body_r, overlap == hole_gap ==
+      # 0.030 m (~11 px at 800 px across a 2.09 m frame) — both comfortably
+      # clear METHODOLOGY.md §3's 3-5 px dilation. Hole diameter is 0.090 m
+      # (~34 px), still ~24 px after a 5 px dilation each side. Step 5 verifies.
+      major_radius: 0.075
+      minor_radius: 0.030
+      # attached at the +X side of the body, standing in the XZ plane
+      offset: [0.188, 0.0, 0.135]
+      major_segments: 48
+      minor_segments: 16
+
+  # ---- distractor objects ---------------------------------------------
+  # Minimal-complexity tier on purpose (ROADMAP.md Phase 4 risk note: do not
+  # over-invest in scene detail). All are placed on a ring of radius 0.70 m,
+  # well clear of the target's 0.225 m silhouette half-width, so no distractor
+  # mask can touch or bleed into the target mask. All are smaller than the
+  # target so it reads as the subject of the scene.
+  distractors:
+    - name: Distractor_Book
+      type: box
+      color: [0.15, 0.25, 0.65]   # blue
+      roughness: 0.6
+      ring_angle_deg: 40.0
+      ring_radius: 0.70
+      dimensions: [0.22, 0.16, 0.06]
+      rotation_z_deg: 15.0
+    - name: Distractor_Ball
+      type: sphere
+      color: [0.20, 0.55, 0.25]   # green
+      roughness: 0.6
+      ring_angle_deg: 130.0
+      ring_radius: 0.70
+      radius: 0.110
+      subdivisions: 4
+    - name: Distractor_Cone
+      type: cone
+      color: [0.85, 0.70, 0.15]   # yellow
+      roughness: 0.6
+      ring_angle_deg: 215.0
+      ring_radius: 0.70
+      radius: 0.130
+      height: 0.260
+      vertices: 48
+    # Was a cylinder ("Can"), swapped to a flat-lying ring: a cylinder is
+    # silhouette-identical to the target's mug body, so from angles where the
+    # handle is occluded or foreshortened the two were distinguishable only by
+    # hue. A torus lying flat on the table is unambiguous from every pose.
+    - name: Distractor_Ring
+      type: torus
+      color: [0.65, 0.60, 0.50]   # tan
+      roughness: 0.6
+      ring_angle_deg: 310.0
+      ring_radius: 0.70
+      major_radius: 0.100
+      minor_radius: 0.035
+      major_segments: 48
+      minor_segments: 16
+
+  # ---- table + backdrop ------------------------------------------------
+  # Deliberately plain (scene brief: background complexity only adds mask risk
+  # for zero scientific benefit). The backdrop is a single open-topped cylinder
+  # ("cyclorama") rather than a flat plane so that NO camera azimuth in the
+  # 360-degree rig can ever see past the edge of the world — a flat backdrop
+  # would leave gaps at some azimuths, which would show up as a hard void in
+  # the background_plate.
+  # Table is deliberately DARKER than the backdrop so there is a visible
+  # horizon where they meet. With both at a similar gray the scene read as
+  # objects floating in fog, which gives a NeRF no geometric cue for the
+  # ground plane and makes the background_plate harder to eyeball.
+  table:
+    name: Table
+    radius: 6.0
+    color: [0.34, 0.33, 0.31]
+    roughness: 0.7
+  # Backdrop albedo is deliberately mid, not bright. The backdrop is a closed
+  # cylinder around the whole scene, so a high-albedo value turns it into a
+  # giant softbox: interreflection fills in every shadow and the render comes
+  # out flat and shadowless. 0.52 keeps a visible horizon against the darker
+  # table while leaving the key light's contact shadows intact.
+  backdrop:
+    name: Backdrop
+    radius: 5.0
+    height: 4.0
+    color: [0.52, 0.52, 0.55]
+    roughness: 0.9
+
+  # ---- lighting --------------------------------------------------------
+  # One soft area light + a low uniform world ambient. No HDRI: an HDRI is
+  # external per-machine state that would break "regenerable from the script
+  # alone".  Soft (large) so contact shadows are legible but not knife-edged.
+  # A smaller, stronger key light against a much weaker ambient. The first
+  # attempt (size 3.0, energy 900, world strength 0.35) was ambient-dominated:
+  # contact shadows were almost invisible. That matters here beyond looks --
+  # the background_plate method (hide_render) is specifically about removing
+  # the target's shadow, so the shadow has to be clearly present in the
+  # original for that difference to be meaningful or measurable at all.
+  lighting:
+    key_light:
+      name: Key_Light
+      location: [1.60, -1.30, 2.60]
+      size: 1.4                   # smaller -> more defined contact shadows
+      # Calibrated by measured frame luminance, not guessed. NOTE this value is
+      # ~10x LOWER than earlier drafts because those were compensating for a
+      # bug: the key light's aim was mis-computed and pointed upward, so the
+      # scene was lit only by ambient/bounce and energy was pushed higher and
+      # higher to compensate. With the aim fixed, 90 W gives frame mean 0.470,
+      # p5 0.310, p95 0.620 and ZERO clipped pixels.
+      energy: 90.0
+    world_background:
+      color: [0.62, 0.65, 0.70]
+      strength: 0.12              # fill only; must not wash out the shadows
+
+# ---- camera -------------------------------------------------------------
+camera:
+  lens_mm: 50.0
+  sensor_mm: 36.0                 # -> 39.6 deg horizontal FOV
+  # Radius 2.9 m derived, not guessed: it is the closest radius that still
+  # frames the full 1.70 m-diameter diorama (frame width 2.09 m at this lens)
+  # while keeping the target at ~1.45% of frame area. At the originally
+  # sketched 4.0 m the target would have been ~0.76% of frame — i.e. BELOW the
+  # visibility threshold, which is why that value was rejected.
+  radius: 2.9
+  look_at: [0.0, 0.0, 0.120]      # mug body center height
+  elevation_min_deg: 25.0         # >=25 so ring distractors cannot occlude the
+  elevation_max_deg: 75.0         # target at grazing angles
+  rig:
+    # TBD — Step 3 deliverable (pose counts 100/10/75, Fibonacci-lattice
+    # generation, and the partition seed). Not set here; Step 3 writes it
+    # before any batch render runs.
+
+# ---- render settings ----------------------------------------------------
+render:
+  resolution: [800, 800]          # matches Lego's native res, so the existing
+                                  # half_res downsampling path applies unchanged
+  engine: CYCLES
+  device: GPU
+  compute_device_type: OPTIX      # D-021: must filter devices on type==OPTIX;
+                                  # this machine also exposes an AMD iGPU (HIP)
+  samples: 128
+  use_denoising: true
+  seed: 0                         # fixed and identical between the original and
+                                  # background_plate render of a given view
+  color_mode: RGBA                # MANDATORY: the loader indexes images[...,-1:]
+                                  # (src/nerf/training.py) and would crash on RGB
+  file_format: PNG
+  # Standard, NOT AgX/Filmic. The NeRF pipeline wants linear-sRGB imagery; a
+  # photographic tone-map would apply a non-linear curve to every training
+  # image and every metric computed from it.
+  view_transform: Standard
+  # Masks are written as 16-bit BW PNG (values 0 and 65535), NOT 8-bit. Any
+  # code that binarizes a mask must assert the bit depth and threshold at
+  # half of the dtype max — D-017's Lego `alpha > 127` assumes uint8 and would
+  # silently mark EVERY mask pixel as foreground on a 16-bit file.
+  mask_color_depth: "16"
+
+  # ---- background plate method ----------------------------------------
+  # DECIDED: hide_render (full removal from camera rays, shadow rays AND
+  # indirect/AO bounces), NOT camera-visibility-only toggling.
+  #
+  # Rationale: a background_plate is supposed to represent the scene as if the
+  # target had never been there (D-003). Camera-visibility-only toggling leaves
+  # the target's cast shadow and contact AO in the plate with no object above
+  # them — a compositing artifact, not ground truth, and one that would make
+  # every hard-erasure poisoned image read as "object gone, shadow remains".
+  #
+  # ACCEPTED CONSEQUENCE: the plate is therefore NOT strictly pixel-identical to
+  # the original outside the raw object silhouette. There is a halo of
+  # legitimate difference (lost contact shadow, AO, colour bleed) extending
+  # beyond the silhouette. This directly bears on whether METHODOLOGY.md §3's
+  # candidate 3-5 px dilation is wide enough -- that range was chosen before
+  # this scene existed, against the simpler Lego-proxy case. It is MEASURED by
+  # the Step 4a pilot, not assumed. Hence null here until that pilot reports.
+  background_plate:
+    method: hide_render
+    mask_dilation_px: null        # Step 4a pilot sets this, with evidence
+
+# ---- V_target visibility threshold --------------------------------------
+# METHODOLOGY.md §2's per-view minimum-visibility constant: the fraction of
+# frame pixels the target's mask must cover for a view to count toward V_target.
+#
+# NOTE this is a DIFFERENT threshold from per-pixel mask binarization. There is
+# no per-pixel threshold to tune here: Blender's ID Mask pass is exactly 0.0/1.0
+# by construction (the real advantage over D-017's Lego alpha-channel proxy).
+#
+# 0.005 (0.5% = 3,200 px of 640,000) is proposed as a STRUCTURAL pass, not a
+# fitted one: the geometry above puts the target at ~1.45% of frame area, i.e.
+# ~3x this threshold, from every pose in the rig. An earlier candidate of 1.0%
+# was REJECTED precisely because the measured ~1.45% would have cleared it by
+# only ~1.4x, making V_target sensitive to pose-by-pose foreshortening -- that
+# is a marginal gate, not a structural one.
+#
+# LOCKED BEFORE V_target IS COMPUTED. Never tuned after seeing the resulting
+# number (same discipline as D-013's pre-committed PSNR range).
+v_target:
+  min_visible_area_fraction: 0.005
+
+# ---- dataset / training ---------------------------------------------------
+dataset:
+  type: blender
+  path: data/blender_scenes
+  half_res: true                  # 800 -> 400, same path Phase 2 validated
+  testskip: 1
+  near: 2.0                       # camera radius 2.9, content radius ~0.85
+  far: 6.0
+
+reproducibility:
+  seed: 0

@@ -84,6 +84,23 @@ poisoned_pixel = mask * (alpha * original + (1 - alpha) * background_plate) + (1
   Blender-rendered, pose-aligned images (`original`, `background_plate`,
   `mask`) — no inpainting, no generative fill, for the synthetic scene.
 
+**Scope of the edit (expected property, not a defect).** Both formulas read
+`background_plate` **only inside the mask**; outside it, the poisoned pixel is
+the original, unchanged. Effects the target has on the scene *beyond its own
+silhouette* — its cast shadow, its contact ambient occlusion, and the diffuse
+colour it bounces onto nearby surfaces — therefore survive poisoning, because
+those pixels lie outside the mask. A poisoned view shows the object removed but
+its shadow still present. This is an inherent, intended consequence of defining
+the attack as a mask-limited edit, not a rendering bug, a misregistration, or a
+plate-generation error, and it is deliberately **not** engineered away: a real
+attacker editing a masked region faces exactly the same constraint, so removing
+it would model an unrealistically strong adversary. It is also why the attack
+is framed (§3, above) as a deliberately weak baseline rather than the
+contribution. The residual shadow is a legitimate detection cue and should be
+reported as such. Measurements of the effect on this study's scene, and the
+reasoning behind keeping §3 unchanged, are in `DECISION_LOG.md` D-022
+(Finding 4) and D-024.
+
 ## 4. Evaluation views
 
 A fixed set of held-out camera poses, disjoint from all training views (clean

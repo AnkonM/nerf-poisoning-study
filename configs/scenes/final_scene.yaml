@@ -6,11 +6,9 @@
 # reads this file and produces data/raw/final_scene.blend; nothing about the
 # scene is hardcoded in a .py file.
 #
-# STATUS: scene geometry, materials, lighting, camera rig and the V_target
-# visibility threshold are all LOCKED — see DECISION_LOG.md D-022 (scene, after
-# the Step 2 preview review) and D-023 (rig + measured near/far). The only
-# value still to be filled in is render.background_plate.mask_dilation_px,
-# which the Step 4a pilot sets with evidence.
+# STATUS: fully LOCKED. Scene geometry/materials/lighting per DECISION_LOG.md
+# D-022 (after the Step 2 preview review), camera rig and measured near/far per
+# D-023, mask dilation per D-024 (Step 4a pilot). No value here is provisional.
 #
 # All lengths in meters. World origin is the center of the table, with the
 # target object sitting on it.
@@ -52,9 +50,13 @@ scene:
       # minor 0.022 / offset 0.205 left only ~3 px of overlap, so the handle
       # visibly floated.
       # With minor 0.030 and offset = major + body_r, overlap == hole_gap ==
-      # 0.030 m (~11 px at 800 px across a 2.09 m frame) — both comfortably
-      # clear METHODOLOGY.md §3's 3-5 px dilation. Hole diameter is 0.090 m
-      # (~34 px), still ~24 px after a 5 px dilation each side. Step 5 verifies.
+      # 0.030 m (~11 px at 800 px across a 2.09 m frame).
+      # CORRECTION (D-024): an earlier version of this comment claimed the hole
+      # (0.090 m, ~34 px face-on) would still be ~24 px open after a 5 px
+      # dilation. That was WRONG — it assumed a face-on circular hole, but the
+      # handle is foreshortened at most rig poses, so the hole is a narrow
+      # ellipse. Measured: at 5 px the hole CLOSES in 10 of the 20 poses where
+      # it is visible at all. This is why D-024 sets dilation to 3 px, not 5.
       major_radius: 0.075
       minor_radius: 0.030
       # attached at the +X side of the body, standing in the XZ plane

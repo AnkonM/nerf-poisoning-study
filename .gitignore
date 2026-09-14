@@ -19,7 +19,15 @@ wheels/
 data/raw/*.blend
 
 # Generated data (regeneratable from configs + code — see PROJECT_STRUCTURE.md)
-data/blender_scenes/
+# NOTE: the rendered PNG sets are ignored, but data/blender_scenes/cameras.json
+# and transforms_*.json are deliberately NOT — they are the durable audit record
+# of the camera rig, and after Phase 4 Step 5 cameras.json carries the MEASURED
+# |V_target| and per-view mask areas, which cannot be regenerated without
+# re-rendering the whole scene. Ignoring the directory wholesale would put a
+# reported number outside version control (D-023).
+data/blender_scenes/train/
+data/blender_scenes/val/
+data/blender_scenes/eval_holdout/
 data/masks/
 data/background_plates/
 data/poisoned/

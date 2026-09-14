@@ -6,10 +6,11 @@
 # reads this file and produces data/raw/final_scene.blend; nothing about the
 # scene is hardcoded in a .py file.
 #
-# STATUS: Step 1 (scene geometry) — object/material/placement values below are
-# PROPOSED and are locked only after the Step 2 human preview review, at which
-# point they are recorded in DECISION_LOG.md. The camera.rig pose counts and
-# selection seed are a Step 3 deliverable and are marked TBD below.
+# STATUS: scene geometry, materials, lighting, camera rig and the V_target
+# visibility threshold are all LOCKED — see DECISION_LOG.md D-022 (scene, after
+# the Step 2 preview review) and D-023 (rig + measured near/far). The only
+# value still to be filled in is render.background_plate.mask_dilation_px,
+# which the Step 4a pilot sets with evidence.
 #
 # All lengths in meters. World origin is the center of the table, with the
 # target object sitting on it.
@@ -176,9 +177,29 @@ camera:
   elevation_min_deg: 25.0         # >=25 so ring distractors cannot occlude the
   elevation_max_deg: 75.0         # target at grazing angles
   rig:
-    # TBD — Step 3 deliverable (pose counts 100/10/75, Fibonacci-lattice
-    # generation, and the partition seed). Not set here; Step 3 writes it
-    # before any batch render runs.
+    # Poses are a Fibonacci lattice over the elevation BAND above, sampling
+    # sin(elevation) uniformly so they are equal-area (not pole-heavy), with a
+    # golden-angle azimuth so no two poses share an azimuth.
+    #
+    # All three pools are cut from that ONE lattice by a seeded shuffle, so
+    # they are disjoint by construction rather than by post-hoc checking —
+    # METHODOLOGY.md §4 requires eval views disjoint from every training view.
+    #
+    # Three pools, not two (D-021): val could structurally have been a subset
+    # of train, but then for poisoned conditions the val-PSNR monitoring signal
+    # would be computed partly on poisoned images.
+    #
+    # eval_holdout is 75, not 100: the binding cost is NOT Blender (~2.4 s per
+    # render) but downstream NeRF evaluation. D-016 measured ~11.5 s/view, and
+    # Phases 6+7 evaluate ~24 runs — 75 views is ~5.7 h of Phase 8 evaluation
+    # versus ~7.7 h for 100. 75 is mid-range of the 50–100 brief and ample for
+    # mean±std across 3 seeds.
+    counts:
+      train: 100                  # matches Lego's training-set scale
+      val: 10                     # monitoring only, never a reported metric
+      eval_holdout: 75            # FROZEN at Step 6
+    partition_seed: 0
+    depth_probe_every: 1
 
 # ---- render settings ----------------------------------------------------
 render:
@@ -252,8 +273,18 @@ dataset:
   path: data/blender_scenes
   half_res: true                  # 800 -> 400, same path Phase 2 validated
   testskip: 1
-  near: 2.0                       # camera radius 2.9, content radius ~0.85
-  far: 6.0
+  # MEASURED from the real scene via Cycles' Z pass over all 185 rig poses
+  # (scripts/build_camera_rig.py --measure-depth), not inherited. Actual depth
+  # range is 1.806 .. 8.346 m; these bracket it with margin.
+  #
+  # The Lego-inherited values (near 2.0, far 6.0) were BOTH wrong for this
+  # scene: near 2.0 sits inside the measured minimum, so it would have clipped
+  # the nearest table surface, and far 6.0 is well short of the 8.346 m far
+  # backdrop wall — the NeRF would have had no sampling range in which to place
+  # the background at all. This is why near/far are measured rather than
+  # carried over from a differently-sized scene.
+  near: 1.5
+  far: 9.0
 
 reproducibility:
   seed: 0

@@ -652,3 +652,150 @@ not just what it currently looks like.
   outside the three `phase3_poc_budget_*` directories); the underlying
   gap in `build_poison_set.py` must be closed before Phase 5/6, not
   reversed.
+
+## D-021 — Phase 4 Step 0: verified Blender/WSL2 bridge, file-location strategy, and pose-pool design
+
+- **Date:** 2026-09-14
+- **Context:** D-008 established the *rationale* for the
+  Windows-Blender/WSL2-Python split but never actually exercised a
+  WSL2-orchestrated headless Blender invocation. This entry records the
+  results of doing so for real before any Phase 4 scene work, per this
+  project's verify-don't-assume precedent (D-009's `verify_env.py`,
+  D-016's CPU-tick diagnosis). All probe work was confined to a scratch
+  directory and a Windows temp folder (since removed); no repo file was
+  written by the investigation itself.
+
+- **Decision 1 — Blender invocation method (verified working):**
+  Blender **5.2.1 LTS** (build date 2026-08-25, Windows release), at
+  `/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe`.
+  Blender is **not** on the inherited Windows PATH from a WSL2 shell, so
+  the explicit `/mnt/c/...` path is required. The canonical invocation
+  for this project is:
+  ```bash
+  "/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" \
+      --background --factory-startup --python "$(wslpath -w script.py)" -- <args>
+  ```
+  A WSL2-resident script is passed by converting its path with
+  `wslpath -w` into `\\wsl.localhost\...` UNC form; Blender reads it
+  without issue. `--factory-startup` is included deliberately so renders
+  cannot be contaminated by whatever GUI preferences happen to be saved
+  on this particular machine — without it, the render is a function of
+  untracked local state, which would break "reproducible from a config +
+  a commit hash."
+
+- **Decision 2 — OptiX confirmed engaged (not a CPU fallback):** with
+  `compute_device_type='OPTIX'` and `scene.cycles.device='GPU'`, the
+  enabled device is `'NVIDIA GeForce RTX 5060 Laptop GPU'`, `type=OPTIX`.
+  Available device types on this machine: `NONE, CUDA, OPTIX, HIP,
+  ONEAPI`. **Note for `render_scene.py`:** this machine also exposes an
+  AMD Radeon 780M iGPU under HIP and the RTX 5060 a second time under
+  CUDA, so the device-enable loop must filter on `d.type == 'OPTIX'`
+  explicitly rather than enabling every listed device — otherwise work
+  can land on the iGPU.
+  **Measured timing** (default cube, 800×800, 64 samples, OptiX
+  denoising): **~1.8–2.2 s/frame** steady state. Two identical 10-frame
+  batches gave means of 1.875 s and 2.236 s — GPU boost/thermal state
+  moves the mean by ~20%, which is *larger than any filesystem effect
+  measured below*. Phase 4 wall-clock estimates use the slower figure.
+
+- **Decision 3 — file-location strategy: Option A (UNC direct).**
+  Blender (the Windows process) writes output directly into the WSL2 repo
+  via its `\\wsl.localhost\Ubuntu-24.04\...` path. No separate
+  copy/rsync step.
+  **Timing evidence.** A first pass comparing whole-render totals
+  suggested Option B (Windows-native) was *slower* than Option A, which
+  is backwards; re-running A reproduced B's number exactly, showing that
+  apparent difference was the thermal effect above, not the filesystem.
+  Isolating pure write cost instead — 20 identical 503 KB PNG writes with
+  `fsync`, issued from the Windows side:
+  | Destination | mean/file | min | max |
+  |---|---|---|---|
+  | **A:** `\\wsl.localhost\Ubuntu-24.04\...` | **9.6 ms** | 7.3 ms | 14.5 ms |
+  | **B:** `C:\Windows\Temp\...` (native) | **1.6 ms** | 1.1 ms | 4.1 ms |
+  UNC therefore costs **~8 ms extra per file**. Phase 4 writes ~545
+  files, so Option A's total penalty **across the entire phase is ~4
+  seconds** — 0.4% of a single frame's render cost, and far below the
+  ~20% thermal variance already present in the measurement.
+- **Alternatives considered (file location):** Option B, render to a
+  Windows-native scratch folder then `robocopy`/`rsync` into the repo —
+  rejected. It is ~6× faster per write in isolation but that advantage is
+  ~4 seconds in absolute terms across all of Phase 4, and it is bought by
+  adding a hand-run step that sits outside any script's control. That is
+  precisely the untracked-provenance failure mode already logged as debt
+  in D-020 (manually-created symlinks that `build_poison_set.py` would
+  not recreate). Paying 4 seconds to keep the render fully
+  script-reproducible is the correct trade under this project's ground
+  rules.
+
+- **Decision 4 — pose-pool design: three disjoint pools (train 100 / val
+  10 / eval_holdout 75).** Investigation of the vendored loader
+  established:
+  1. `load_blender_data` (`src/nerf/datasets/blender.py`) opens all three
+     of `transforms_{train,val,test}.json` **unconditionally** in a single
+     `basedir` — there is no "no-val" code path, so a val entry must exist.
+  2. Val-subset PSNR monitoring (`src/nerf/training.py`) draws a fixed
+     deterministic slice `i_val[:5]` — the first 5 frames of
+     `transforms_val.json`. It does **not** structurally require a
+     disjoint pose pool; a re-pointed subset of `train/` would work at
+     zero extra render cost.
+  3. The loader requires **RGBA** input (`images[..., -1:]` is indexed
+     for the white-background composite; 3-channel data would crash).
+     Verified on a probe render that Blender PNG output with
+     `color_mode='RGBA'` yields `(800,800,4)` uint8 with alpha == 255
+     everywhere (Film>Transparent off), making the white-background
+     composite a mathematical no-op here — so `render.white_background`
+     is don't-care for this scene, but `color_mode='RGBA'` is mandatory.
+  4. `camera_angle_x` is read from the **last** split iterated (`test`),
+     so all three transforms files must agree on it or focal length
+     silently comes from the wrong file.
+  Despite (2) permitting a two-pool design, **three disjoint pools were
+  chosen**: if val frames were drawn from `train/`, then for every
+  poisoned condition the val-PSNR monitoring signal would be computed
+  partly on poisoned images, making the one live convergence signal
+  during a long training run misleading exactly where it matters most.
+  ~10 extra renders (~40 s) is a trivial price for a monitoring signal
+  that means the same thing in every condition.
+- **Alternatives considered (pose pools):** (a) val as a deterministic
+  subset of `train/` — rejected per the contamination reasoning above;
+  (b) val as a subset of `eval_holdout/` — rejected because it would have
+  the training loop reading the frozen holdout on every validation
+  interval, which weakens the "the holdout is only ever touched by
+  `evaluate.py`" discipline (`METHODOLOGY.md` §4) even though the access
+  is read-only.
+
+- **Finding 5 — camera-pose convention: already verified, no conversion
+  needed.** Phase 2 explicitly recorded the convention in two places
+  (`src/nerf/datasets/blender.py`'s module docstring and
+  `experiments/logs/phase2_lego_sanity.md`): right-handed world
+  coordinates, per-frame `transform_matrix` is a 4×4 camera-to-world
+  matrix, camera looks down its own local −Z with +Y up and +X right.
+  **This is Blender's own native camera convention**, so Phase 4's rig
+  can write `camera.matrix_world` into `transform_matrix` verbatim with
+  no axis conversion. This retires what would otherwise have been Phase
+  4's single highest-risk item, and is exactly what `ROADMAP.md` Phase 2's
+  "verify the convention matches Phase 4's scene" task existed to buy.
+
+- **Finding 6 — D-020 debt explicitly rescheduled, not resolved here.**
+  The Phase 3 handoff asked that D-020 (`build_poison_set.py` does not
+  emit a self-contained dataset dir; Phase 3's val/test are hand-made
+  symlinks) be resolved *or explicitly rescheduled in writing* before
+  Phase 4 got far. **It is hereby rescheduled to Phase 5's first task.**
+  Rationale: Phase 4 does not invoke `build_poison_set.py` at any point —
+  it produces the clean scene, plates, masks and frozen holdout, all of
+  which are upstream of poisoning — so fixing it now would be speculative
+  work against a pipeline whose Phase 4 inputs do not yet exist. Phase 5
+  is both the first point the script is actually used on real data and
+  the phase whose own task list already owns it.
+
+- **Rationale / evidence:** every number above is measured on this
+  machine in this session, not assumed — per the explicit instruction to
+  verify rather than assume the Windows/WSL2 Blender bridge works.
+- **Reversibility:** low cost throughout. The invocation method and
+  device filter are a few lines in `scripts/render_scene.py`. The file
+  strategy is a single output-path choice; switching to Option B later
+  would mean adding a sync step, not re-rendering anything. The pose-pool
+  design is the one item with real switching cost: once
+  `eval_holdout/` is frozen at Phase 4 Step 6 it cannot change, and
+  dropping the separate val pool afterward would mean either regenerating
+  the train pool or accepting contaminated monitoring — so it is settled
+  now, before any render, deliberately.

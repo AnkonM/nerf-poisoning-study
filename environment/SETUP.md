@@ -160,12 +160,32 @@ Build/edit `data/raw/*.blend` scene files in the normal Windows GUI.
 ### 3.4 Scripted dataset rendering (headless)
 
 The `original` / `background_plate` / `mask` triples and camera-pose JSON
-(`METHODOLOGY.md` §3–4) are produced by running Blender in background mode
-from Windows, not WSL2:
+(`METHODOLOGY.md` §3–4) are produced by running Blender in background mode.
+The Blender *process* is a Windows process either way (D-008), but it can be
+**launched and orchestrated from a WSL2 shell** — verified 2026-09-14, see
+`DECISION_LOG.md` D-021. This is the form Phase 4+ scripts use, so the whole
+pipeline can be driven from one shell:
 
+```bash
+"/mnt/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" \
+    --background --factory-startup \
+    "$(wslpath -w data/raw/final_scene.blend)" \
+    --python "$(wslpath -w scripts/render_scene.py)" -- <args>
 ```
-blender.exe --background scene.blend --python scripts/render_scene.py
-```
+
+Notes (all verified, D-021):
+
+- Blender is **not** on the inherited Windows PATH inside WSL2 — the explicit
+  `/mnt/c/...` path is required. Version in use: **Blender 5.2.1 LTS**.
+- Pass WSL2-resident paths through `wslpath -w` (`\\wsl.localhost\...`);
+  Blender reads and writes them fine.
+- `--factory-startup` is deliberate: without it the render depends on
+  whatever GUI preferences are saved on the local machine, which is
+  untracked state and breaks reproducibility.
+- When enabling OptiX in a render script, filter devices on
+  `d.type == 'OPTIX'` specifically. This machine also lists an AMD Radeon
+  780M iGPU (HIP) and the RTX 5060 again under CUDA; enabling everything
+  can push work onto the iGPU.
 
 ### 3.5 Bridging Windows-rendered output into the WSL2 repo
 
@@ -178,8 +198,22 @@ Pick **one** of these and use it consistently (don't mix):
   `robocopy`/`rsync` into `data/blender_scenes/` and `data/masks/` inside
   WSL2 as a documented step before Phase 4/5 scripts run.
 
-Whichever is chosen, record it here (update this line once decided) so the
-data-provenance trail stays intact.
+**DECIDED (2026-09-14, `DECISION_LOG.md` D-021): the UNC path.** Blender
+writes directly into the WSL2 repo; there is no copy step, and no Phase
+4/5 script should add one. Measured cost of this choice: a UNC write is
+~9.6 ms/file vs ~1.6 ms/file Windows-native, i.e. **~8 ms extra per
+file**, which across Phase 4's ~545 output files totals **~4 seconds** —
+against a ~2 s/frame render, and below the ~20% run-to-run variance that
+GPU thermal/boost state already introduces. The 4 seconds buys a render
+that is fully reproducible from a script alone, with no hand-run step
+outside version control (the failure mode logged in D-020).
+
+Convert a repo path to its UNC form with `wslpath -w`:
+
+```bash
+wslpath -w /home/ankon/projects/nerf-poisoning-study/data
+# -> \\wsl.localhost\Ubuntu-24.04\home\ankon\projects\nerf-poisoning-study\data
+```
 
 ## 4. Sanity check before Phase 1 begins
 

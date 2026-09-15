@@ -43,6 +43,8 @@ def main() -> None:
         dataset_cfg["path"],
         half_res=dataset_cfg.get("half_res", False),
         testskip=dataset_cfg.get("testskip", 1),
+        val_dir=dataset_cfg.get("val_path"),
+        test_dir=dataset_cfg.get("test_path"),
     )
     _, _, i_test = i_split
     print(f"Test-set size: {len(i_test)} views")

@@ -48,6 +48,8 @@ def main():
     images_rgba, poses, hwf, i_split = load_blender_data(
         dataset_cfg["path"], half_res=dataset_cfg.get("half_res", False),
         testskip=dataset_cfg.get("testskip", 1),
+        val_dir=dataset_cfg.get("val_path"),
+        test_dir=dataset_cfg.get("test_path"),
     )
     white_bkgd = cfg["render"].get("white_background", True)
     alpha = images_rgba[..., 3]  # normalized to [0, 1] by load_blender_data's `/255.0`

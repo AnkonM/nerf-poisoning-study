@@ -177,6 +177,10 @@ def train_from_config(
         dataset_cfg["path"],
         half_res=dataset_cfg.get("half_res", False),
         testskip=dataset_cfg.get("testskip", 1),
+        # optional per-split dirs (D-028): poisoned train from its own
+        # condition dir, val/eval_holdout from the frozen canonical location
+        val_dir=dataset_cfg.get("val_path"),
+        test_dir=dataset_cfg.get("test_path"),
     )
     i_train, i_val, i_test = i_split
     print(f"Loaded blender data: images={images.shape}, hwf={hwf}, datadir={dataset_cfg['path']}")

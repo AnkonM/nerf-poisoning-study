@@ -1512,3 +1512,210 @@ sets". These read differently and the difference is material.
 - **Reversibility:** low cost to narrow later (train on a subset of the generated
   sets); expensive to widen after Phase 6 runs, so it is settled before any
   dataset is built.
+
+## D-029 — Phase 5 implementation: unified compositor, alpha = 0.4, per-split loader paths
+
+- **Date:** 2026-09-15
+- **Scope:** the implementation decisions behind Phase 5's pipeline. Nothing here
+  changes `METHODOLOGY.md` §1–§7 (frozen 2026-09-14); §10 stays empty. The one
+  value newly fixed — soft-suppression `alpha` — is pre-registered by §3, which
+  says the exact value is "recorded ... when set".
+
+### 1. One compositor, not two
+
+`src/poisoning/compositor.py` now implements §3's formulas as a **single**
+function `composite(original, mask, plate, alpha)`:
+
+```
+poisoned = mask*(alpha*original + (1-alpha)*plate) + (1-mask)*original
+```
+
+Hard erasure is exactly its `alpha = 0` case, so `hard_erasure` and
+`soft_suppression` are thin wrappers rather than parallel implementations. Two
+separate implementations could drift apart in rounding, dtype handling or
+alpha-channel treatment and silently make C3 and C6 incomparable — which would
+be invisible in the outputs and fatal to the C3-vs-C6 contrast the study depends
+on.
+
+- **Regression check (run, not assumed):** the Phase 3 implementation was
+  extracted from commit `09df0de` and compared against the new code at
+  `alpha = 0` over **10 cases** — four real final-scene views (RGBA uint8, real
+  16-bit masks, real plates), three Phase 3-style synthetic cases (flat
+  mid-grey proxy, alpha-channel mask), plus RGB/uint8 binary-mask, graded-mask
+  and float32 cases to exercise the rounding and dtype paths.
+  **Result: 10/10 bit-identical, dtypes preserved.**
+- `soft_suppression` **requires** an explicit alpha and raises on `alpha <= 0`:
+  a default would be an un-recorded per-image parameter, and `alpha = 0` would
+  silently make C6 a duplicate of C3.
+
+### 2. Soft-suppression `alpha` = **0.4** (locked)
+
+Within §3's pre-registered 0.4–0.5 candidate range.
+
+- **Rationale:** (a) §3 describes the target as remaining "faintly present, only
+  degraded" and D-004 describes blending "toward the background plate" — 0.4
+  (60% plate weight) matches that description better than the range's upper end;
+  (b) a larger gap between the poisoned minority and the clean majority of
+  training views should produce a clearer, more learnable suppression signal,
+  giving Phase 6 a better chance of a graded, analysable result rather than one
+  statistically indistinguishable from the control; (c) alpha must stay
+  meaningfully above 0, since `alpha = 0` is mathematically hard erasure and
+  would make C6 redundant with C3.
+- **Confirmed empirically after generation:** C6's mean inside-mask
+  |difference| is **40.89** against C3's **68.09** on the same view — a ratio of
+  **0.60**, exactly the `1 - alpha` the formula predicts. The visual check shows
+  the mug clearly still present but washed toward the plate.
+- Recorded in `configs/poisoning/soft_suppression_20.yaml`. Held constant across
+  every soft-suppression image; never varied per image or per budget (§3).
+
+### 3. Loader gains optional per-split directories
+
+`load_blender_data` now accepts `val_dir` / `test_dir`, defaulting to `None`
+= "same as basedir", i.e. byte-identical behaviour for every existing caller
+(`lego_sanity.yaml`, the Phase 3 configs). Additive and default-preserving, the
+same pattern as D-019. Three call sites updated (`src/nerf/training.py`,
+`scripts/evaluate.py`, `scripts/phase3_poc_eval_views.py`).
+
+**Added safety check:** the loader now **verifies `camera_angle_x` agrees across
+all three splits** and raises if not. Upstream took it from whichever split
+parsed last, which was only ever safe because the files agreed. Per-split
+directories make genuine divergence possible for the first time, and a mismatch
+would silently yield a wrong focal length and quietly wrong geometry in every
+downstream metric. Verified both datasets agree (lego and final_scene, all three
+splits `0.6911112070083618`) before making it a hard error.
+
+### 4. Strategic selection and the tie-break
+
+`sample_strategic` implements §7's "largest target mask area first" with the
+D-028 tie-break `(-area, view_index)`. Areas are read from `cameras.json`'s
+recorded values and the function **raises** if a view has no recorded area —
+§2 forbids recomputing them mid-study, so silently recomputing would be worse
+than failing. `sample_random` was deliberately **left untouched**: its exact
+behaviour determines which views Phase 3 poisoned.
+
+Verified on the real data: C7 selects exactly 20 views, identical across 200
+shuffled input orderings, and the real rank-35/36 tie resolves `r_057` before
+`r_073`.
+
+### 5. Config schema
+
+The eight `configs/poisoning/*.yaml` files documented in `PROJECT_STRUCTURE.md`
+are preserved, each carrying `seeds: [1, 2, 3]`, with the build script expanding
+seeds internally (D-028's 20 datasets). Per D-028 finding 3, **`mask_dilation_px`
+is absent from every condition config** and inherited from
+`configs/scenes/final_scene.yaml` — verified all eight resolve it to 3.
+
+- **Reversibility:** the compositor and loader changes are additive and covered
+  by tests, so they are cheap to revise before Phase 6 training starts. `alpha`
+  is not: once C6 is trained, changing it would invalidate that condition and
+  require a §10 deviation entry.
+
+## D-030 — Phase 5 gate: PASS; D-020 debt closed and its failure mode fixed
+
+- **Date:** 2026-09-15
+- **Gate (stated against `ROADMAP.md` Phase 5's exact wording): PASS.**
+
+| gate criterion | result |
+|---|---|
+| "for every condition, `MANIFEST.csv` view counts match `round(b/100 * \|V_target\|)` exactly" | **PASS** — all 20 datasets, 100 rows each: 0/5/10/20/30/50 as required |
+| "visual spot-check ... confirms only the target region differs from the original" | **PASS** |
+
+**Supporting validation:**
+
+- **Outside-mask strict byte identity: PASS — 425 poisoned images, 0
+  deviations.** This is a *strict* `np.array_equal` check, deliberately unlike
+  Phase 4's loosened far-field bound: the formula writes only where `mask == 1`,
+  so `poisoned == original` outside the dilated mask holds **by construction**
+  and any deviation would be a real bug, not an expected property.
+- Unpoisoned views byte-identical to source: **1,575 / 1,575**.
+- Attack is not a no-op: inside-mask mean |diff| C3 68.09, C6 40.89, C7 48.95.
+- Loader round-trip on a poisoned condition via the new per-split paths:
+  **100 / 10 / 75**, focal 555.556.
+- Frozen eval set untouched by all of Phase 5: `freeze_eval_set.py --verify`
+  **PASS**, aggregate still `211a5a59…5ab214`.
+- **29 pytest tests pass.**
+- Condition contrasts are clean: C3 and C6 at the same seed select **identical
+  views** (only attack type differs); C7's selection differs from C3's and
+  matches the independently-computed strategic list exactly.
+- Per-seed selections are genuinely distinct, with overlaps tracking chance
+  (5% budget → 0/5 overlap between seeds 1 and 2; 50% → 24/50 against an
+  expectation of 25).
+
+### D-020 closure
+
+D-020 recorded that `build_poison_set.py` emitted only `train/` +
+`transforms_train.json`, with Phase 3's `val`/`test` **symlinked in by hand** —
+so a condition was not reproducible from its config alone, violating
+`PROJECT_STRUCTURE.md`'s contract.
+
+Closed, with the fix **verified rather than asserted**:
+
+1. A condition directory now contains **exactly** `train/` +
+   `transforms_train.json`. No `val/`, no `test/`, no symlinks — `val` and the
+   frozen `eval_holdout` are reached through config paths (D-029 §3).
+2. **Byte-identical regeneration proven:** `C6_seed2` and `C7` were deleted
+   outright and rebuilt from their configs alone; `diff -r` reports both
+   byte-identical.
+3. **Zero symlinks** exist anywhere in Phase 5's output.
+4. The 12 remaining symlinks are Phase 3's own, and are **inert**: verified by
+   search that none of the eight study configs, and no code under
+   `scripts/build_poison_set.py`, `src/poisoning/`, `src/data_pipeline/` or
+   `src/nerf/`, references any `phase3_poc` path — the only referents are Phase
+   3's own three configs and its two analysis scripts
+   (`scripts/phase3_poc_eval_views.py`, `scripts/export_tb_curves.py`). They are
+   historical artifacts of a run whose own log entries are the authoritative
+   record, and nothing in Phase 5 or Phase 6 reads them.
+
+**With (4) confirmed, D-020 is fully closed.**
+
+### An incident during this phase, and why the fix goes beyond it
+
+While smoke-testing the new builder, `data/poisoned/MANIFEST.csv` was rewritten
+under the Phase 5 schema while it still held the Phase 3 PoC's rows. The writer
+re-emitted those foreign rows through its own `DictWriter`, **silently dropping
+the three columns it did not know about** (`mask_alpha_threshold`,
+`background_proxy_method`, `background_proxy_value`). The file is gitignored, so
+git could not restore it.
+
+- **Impact: none to the project record.** Those columns duplicated information
+  whose authoritative home is D-017 and `experiments/logs/phase3_poc_*.md`.
+- **Repair:** the 300 Phase 3 rows were reconstructed exactly from the Phase 3
+  configs (selection re-derived with the same seeded `sample_random`, which was
+  deliberately never modified) into a separate
+  `data/poisoned/MANIFEST_phase3_poc.csv` under their original schema —
+  cross-checked against the recorded 20 and 50 poisoned counts. `MANIFEST.csv`
+  is now scoped to the real study only.
+- **Underlying failure mode fixed, not just the occurrence:** the writer now
+  **refuses to rewrite a manifest whose header does not match its own schema**,
+  reporting both headers and exiting rather than dropping columns. Tested by
+  pointing it at a foreign-schema file; it fails loudly. This is the part that
+  matters for D-020's closure — the debt was about a pipeline that could damage
+  its own reproducibility artifacts without saying so, and a guard that makes
+  that class of silent loss impossible is the actual fix.
+- **Reversibility:** n/a (a repair and a guard, not a design choice).
+
+## D-031 — Known debt: `requirements.txt`'s documented regeneration command strips its own header
+
+- **Date:** 2026-09-15
+- **Finding:** `environment/requirements.txt` opens with a 12-line header
+  ("DO NOT HAND-EDIT", the exact `uv export` command to regenerate it, and the
+  D-009/D-010 rationale). Running **that exact documented command** does not
+  reproduce the header — `uv export` emits only its own preamble and the pinned
+  requirements, so following the file's own instructions literally **deletes the
+  instructions**.
+- **Discovered:** while adding `pytest` as a dev dependency in Phase 5. The
+  dependency lines themselves were unchanged (pytest is dev-only and correctly
+  excluded by `--no-dev`), so the file was restored from git and verified
+  line-for-line identical to a fresh export, header intact.
+- **Not fixed now**, logged as debt. It is a documentation-consistency defect,
+  not a correctness one: the pinned versions are always correct, only the
+  explanatory header is fragile. Fixing it mid-phase would have meant editing a
+  D-010 artifact for reasons unrelated to Phase 5's goals.
+- **Options for whoever picks it up:** (a) change the documented command to a
+  two-step form that re-prepends the header (e.g. a `scripts/` helper or a
+  `cat header - >` pipeline), or (b) move the explanation out of the generated
+  file and into `environment/SETUP.md`, leaving `requirements.txt` purely
+  machine-generated. (b) is probably cleaner — a generated file that carries
+  hand-written content it cannot regenerate is the defect itself.
+- **Reversibility:** trivial either way; nothing depends on the header's
+  presence except a human reading it.

@@ -16,7 +16,7 @@ that's the whole point of having gates.
 | 2 — Lego clean-NeRF sanity check | Complete | PASS — clean-Lego test PSNR 31.550 dB, within the D-013 range (29–33 dB). See `DECISION_LOG.md` D-016 and `experiments/logs/phase2_lego_sanity.md`. |
 | 3 — Poisoning proof of concept (Lego) | Complete | PASS — monotonic PSNR degradation with poisoning budget (masked PSNR 23.6→19.4→11.6 dB at 0/20/50% budget), zero pipeline errors across all checks. See `DECISION_LOG.md` D-017–D-020. |
 | 4 — Final scene + eval set | Complete | PASS — `\|V_target\|` = 100/100 training views (mask area 1.47–2.18% of frame vs the 0.5% threshold locked before measurement; smallest margin 2.95x), so 5% → 5 poisoned views; eval set frozen read-only, 226 files, aggregate SHA-256 `211a5a59…5ab214`; `METHODOLOGY.md` frozen 2026-09-14. See `DECISION_LOG.md` D-021–D-026. |
-| 5 — Poisoning pipeline build | Not started | — |
+| 5 — Poisoning pipeline build | Complete | PASS — manifest counts exact for all 20 datasets (0/5/10/20/30/50 = `round(b/100 × 100)`); outside-mask strict byte identity across 425 poisoned images, 0 deviations; 1,575/1,575 unpoisoned views byte-identical; 29 pytest tests pass; D-020 closed with byte-identical regeneration proven. See `DECISION_LOG.md` D-028–D-031. |
 | 6 — Minimum poisoning-budget sweep | Not started | — |
 | 7 — Ablation (random vs strategic) | Not started | — |
 | 8 — Evaluation & analysis | Not started | — |
@@ -209,15 +209,22 @@ sufficient, extra detail buys nothing.
 real scene.
 
 **Tasks:**
-- [ ] Implement/finalize hard-erasure and soft-suppression compositing
-  against real `background_plate`/`mask` triples.
-- [ ] Implement random and strategic view-selection (`view_selection.py`).
-- [ ] Implement `build_poison_set.py` (config in → poisoned image set +
-  `MANIFEST.csv` out).
-- [ ] Write unit tests: compositor output matches expected pixels on a
-  synthetic test case; manifest counts match the target-visible-view budget
-  math from `METHODOLOGY.md` §2 exactly.
-- [ ] Generate all 8 conditions' poisoned sets (§5 of METHODOLOGY.md).
+- [x] Compositing implemented as ONE alpha-parameterized function (hard
+  erasure is its `alpha=0` case), verified bit-identical to the Phase 3
+  implementation over 10 cases. Soft-suppression `alpha` locked at **0.4**
+  (D-029).
+- [x] Random and strategic view-selection (`view_selection.py`), with an
+  explicit `(-area, view_index)` tie-break (D-028).
+- [x] `build_poison_set.py` rewritten — this is the **D-020 fix**: a
+  condition dir now holds only `train/` + `transforms_train.json`, with
+  val/eval_holdout reached via config paths instead of hand-made symlinks.
+  Byte-identical regeneration from config alone proven (D-030).
+- [x] **29 pytest tests** (`tests/`, previously empty): compositor pixel
+  math, alpha=0 collapse, budget arithmetic pinned to the real function's
+  outputs, tie-break determinism, mask bit-depth assertions.
+- [x] Generated **20 datasets**, not 8 — `METHODOLOGY.md` §8 ties view
+  selection to the same seed as model init, so C1–C6 get one set per seed;
+  control and C7 are seed-invariant (D-028).
 
 **Gate:** for every condition, `MANIFEST.csv` view counts match
 `round(b/100 * |V_target|)` exactly; visual spot-check of a handful of

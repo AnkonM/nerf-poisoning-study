@@ -1,4 +1,4 @@
-# Condition C3 — see docs/METHODOLOGY.md §5.
+# Condition C6 — see docs/METHODOLOGY.md §5.
 #
 # METHODOLOGY.md is FROZEN (2026-09-14). The values below implement §5's
 # conditions matrix; they do not reinterpret it.
@@ -8,18 +8,22 @@
 # ../scenes/final_scene.yaml as render.background_plate.mask_dilation_px.
 # A pre-Phase-4 scaffold of this file carried a contradicting `mask_dilation_px: 4`
 # under `poisoning:` — a silent second source of truth. See DECISION_LOG.md D-028.
+#
+# Soft suppression (D-004: near-mandatory, preempts the "you just deleted the
+# object" objection). Same budget and selection method as C3 -- ATTACK TYPE is
+# the only difference, so C3 vs C6 isolates hard erasure vs graded suppression.
 
 defaults:
   - ../base.yaml
   - ../scenes/final_scene.yaml
 
-condition_id: C3
+condition_id: C6
 
 poisoning:
   budget_percent: 20      # percent of V_target (=100), per METHODOLOGY.md §2
-  attack_type: hard_erasure
+  attack_type: soft_suppression
   view_selection: random
-  alpha: null       # only used when attack_type == soft_suppression (§3)
+  alpha: 0.4       # only used when attack_type == soft_suppression (§3)
 
 # METHODOLOGY.md §8: view selection uses the SAME seed set as model
 # initialisation, so each seed yields its own poisoned dataset (D-028).

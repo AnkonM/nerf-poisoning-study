@@ -1,4 +1,4 @@
-# Condition C3 — see docs/METHODOLOGY.md §5.
+# Condition C1 — see docs/METHODOLOGY.md §5.
 #
 # METHODOLOGY.md is FROZEN (2026-09-14). The values below implement §5's
 # conditions matrix; they do not reinterpret it.
@@ -13,10 +13,10 @@ defaults:
   - ../base.yaml
   - ../scenes/final_scene.yaml
 
-condition_id: C3
+condition_id: C1
 
 poisoning:
-  budget_percent: 20      # percent of V_target (=100), per METHODOLOGY.md §2
+  budget_percent: 5      # percent of V_target (=100), per METHODOLOGY.md §2
   attack_type: hard_erasure
   view_selection: random
   alpha: null       # only used when attack_type == soft_suppression (§3)

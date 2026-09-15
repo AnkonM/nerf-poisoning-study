@@ -1381,3 +1381,134 @@ the attempts, the set still contains its 75 held-out views and
 - **Reversibility:** n/a — a measured property of the toolchain, not a
   decision. Revisit only if Blender/OptiX ever guarantees bit-exact output,
   which would allow tightening the claim.
+
+## D-028 — Phase 5 Step 0: dataset-assembly mechanism, strategic tie-break, seed policy
+
+- **Date:** 2026-09-15
+- **Scope:** the two design decisions Phase 5 depends on, plus two findings that
+  turned up while establishing them. All evidence below was measured, not
+  inferred. `METHODOLOGY.md` is frozen; nothing here changes §1–§7, so no §10
+  deviation entry is required.
+
+### Finding 1 — the real scene uses NO symlinks; split resolution is by relative path
+
+`find data -type l` returns **only** the Phase 3 Lego PoC symlinks
+(`data/poisoned/phase3_poc_budget_*/{val,test,transforms_val.json,transforms_test.json}`)
+— D-020's debt, still the only symlinks in the repo. What makes
+`load_blender_data` report 100/10/75 on the real scene is simply that each
+transforms file's `file_path` entries are relative to the one `basedir`:
+
+| file | frames | first `file_path` |
+|---|---|---|
+| `transforms_train.json` | 100 | `./train/r_000` |
+| `transforms_val.json` | 10 | `./val/r_000` |
+| `transforms_test.json` | 75 | `./eval_holdout/r_000` |
+
+The loader joins `basedir` + `file_path`, so "test" resolves into `eval_holdout/`.
+This was a deliberate Phase 4 choice (`blender_build_rig.py`'s `dir_of` map),
+recorded in D-023's naming note — not an accident or an alias.
+
+Also measured: the loader's directory coupling is **shallow**. It takes one
+`basedir` and has only three call sites (`src/nerf/training.py:176`,
+`scripts/evaluate.py:43`, `scripts/phase3_poc_eval_views.py:48`). And a `../`
+escape inside a `file_path` does resolve — but **only when the containing
+directory already exists on disk**, which would have been a real trap had that
+route been chosen.
+
+### Decision 1 — dataset assembly: per-split config paths (option b)
+
+`load_blender_data` gains **optional** per-split path overrides; passing none
+preserves today's behavior exactly, so `lego_sanity.yaml` and the Phase 3 configs
+are unaffected. This is the same additive, default-preserving pattern used for
+vendored code in D-019.
+
+A poisoned condition directory therefore contains **only** `train/` +
+`transforms_train.json`. `val` and `eval_holdout` are read directly from their
+single canonical frozen location — never copied, never symlinked, never rewritten
+per condition.
+
+- **Alternatives considered:** (a) script-generated symlinks — rejected: it fixes
+  D-020's literal complaint (manual creation) while keeping per-condition links
+  into the frozen set, multiplying the reference surface the freeze exists to
+  eliminate across 20 datasets now and 24+ runs in Phase 6. (c) rewriting
+  val/test `file_path`s to `../../blender_scenes/...` inside per-condition
+  transforms files — verified working and requiring no loader change at all, but
+  rejected because it mirrors the frozen pose JSON into every condition
+  directory, creating N copies that can silently go stale against the frozen
+  original.
+- **Rationale:** the frozen eval set should have exactly one referencing path in
+  the whole project. Option (b) is the only one of the three that achieves that
+  for both images *and* poses, and the investigation showed its cost is small and
+  contained (one function, three call sites, one config key) rather than the
+  "extensive changes to shared training infrastructure" that would have argued
+  against it.
+- **Reversibility:** moderate. The loader change is additive and backward
+  compatible, so reverting means dropping the optional arguments. But once Phase 6
+  training runs reference per-split paths, changing the scheme would mean
+  rewriting those configs — do it now, not later.
+
+### Finding 2 + Decision 2 — strategic-selection tie-break
+
+Measured from `cameras.json`'s recorded per-view areas (converted back to exact
+pixel counts; range 9,438–13,929 px of 640,000):
+
+- **Exact ties exist: one pair** — `r_057` and `r_073`, both **12,554 px**, at
+  **ranks 35 and 36**.
+- **At C7's rank-20 cut there is NO tie:** rank 20 `r_051` = 13,306 px, rank 21
+  `r_044` = 13,303 px — a **3-pixel gap** (0.0000047 of frame).
+- The top-20 is empirically stable across 200 shuffled input orderings, precisely
+  because the boundary is untied.
+
+So C7 is deterministic today by a property of the data, not by construction. A
+3 px margin is fragile to any future change in threshold, dilation or scene, and
+the rank-35/36 tie proves ties are real here rather than hypothetical. (Masks were
+pixel-identical under D-027's regeneration check, so the areas are stable to
+re-rendering — the exposure is config change, not render nondeterminism.)
+
+- **Decision:** strategic selection sorts by **`(-mask_area, view_index)`** —
+  descending area, ascending view index as a total-order tie-break.
+- **Alternatives considered:** leaving ties to the sort's input order — rejected,
+  that makes the result depend on dict iteration or filesystem listing order,
+  which is latent nondeterminism inside a project whose core claim is
+  reproducibility from config + commit. Tie-break by a random seed — rejected as
+  strictly worse than a deterministic rule for no benefit.
+- **Rationale:** it changes nothing about today's C7 selection (verified), so it
+  costs nothing now and removes a whole class of future silent irreproducibility.
+
+### Finding 3 — a pre-Phase-4 config stub contradicts the frozen protocol
+
+`configs/poisoning/budget_20.yaml` (dated 2026-09-10, written before Phase 4)
+carries `poisoning.mask_dilation_px: 4`. The frozen `METHODOLOGY.md` §3 and D-024
+lock dilation at **3 px**. Because the stub's key sits under `poisoning.` while
+the scene config's sits under `render.background_plate.`, it does not override —
+it is a silent *second source of truth that disagrees*.
+
+- **Decision:** remove `mask_dilation_px` from per-condition configs entirely and
+  read the inherited value from `configs/scenes/final_scene.yaml`. §3 specifies
+  the dilation is "fixed once ... applied uniformly", so copying it into eight
+  condition files is a drift hazard with no upside.
+
+### Finding 4 — seed policy: 20 poisoned datasets, not 8
+
+Frozen §8 states random view selection "uses the same seed set as model
+initialization, and both are recorded per run", which implies run
+(condition, seed *s*) selects its poisoned views with seed *s* — a distinct
+poisoned set per seed. ROADMAP Phase 5 instead says "all 8 conditions' poisoned
+sets". These read differently and the difference is material.
+
+- **Decision (confirmed with the project lead): the §8 reading — per-seed
+  selection.** Control (0% poisoned) and C7 (strategic, deterministic) are
+  seed-invariant and need one dataset each; C1–C6 need three each.
+  **Total: 20 datasets.**
+- **Rationale:** mean ± std across seeds is supposed to capture the intervention's
+  run-to-run variance. If all three runs of a condition poisoned the *same* views,
+  the reported spread would reflect model-initialisation variance only and would
+  understate the real variability, since *which* views are poisoned is genuinely
+  part of the intervention. Cost is ~1.26 GB (63 MB per set, 932 GB free).
+- **Not a deviation:** this is an interpretation of frozen text, not a change to
+  it, so §10 stays empty. The eight documented `configs/poisoning/*.yaml` files
+  are preserved — each carries `seeds: [1, 2, 3]` and the build script expands
+  them, so `PROJECT_STRUCTURE.md`'s documented layout is unchanged.
+- **Reversibility:** low cost to narrow later (train on a subset of the generated
+  sets); expensive to widen after Phase 6 runs, so it is settled before any
+  dataset is built.

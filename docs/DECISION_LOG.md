@@ -1719,3 +1719,195 @@ git could not restore it.
   hand-written content it cannot regenerate is the defect itself.
 - **Reversibility:** trivial either way; nothing depends on the header's
   presence except a human reading it.
+
+## D-032 — Phase 6 Step 0/1: four latent config defects found before any GPU time was spent
+
+- **Date:** 2026-09-16
+- **Scope:** Phase 6's Step 0 investigation, executed read-only against commit
+  `7863154`, plus the config and harness fixes it forced. Nothing here changes
+  `METHODOLOGY.md` §1–§7 (frozen 2026-09-14) — §1–§7 say nothing about training
+  hyperparameters or dataset plumbing — so **§10 stays empty**.
+- **Why this entry is long:** Phase 6 is a CONSUME phase. Each of the four
+  defects below was invisible, would have survived into completed runs, and
+  would have been attributed to the scene or the poisoning pipeline rather than
+  to a config. Finding them cost an afternoon of reading; finding them at run 19
+  would have cost the phase.
+
+### Finding 1 — every condition config silently resolved to the CLEAN dataset
+
+The Phase 5 handoff records `dataset.path` as "deliberately not set, because it
+varies per seed". It was not unset. It was **inherited** from
+`configs/scenes/final_scene.yaml` as `data/blender_scenes`. Measured by
+resolving the real config through the real loader:
+
+```
+load_config('configs/poisoning/budget_20.yaml')
+  dataset.path         = 'data/blender_scenes'   <- the CLEAN scene
+  reproducibility.seed = 0                        <- not 1/2/3
+```
+
+`python scripts/train.py configs/poisoning/budget_20.yaml` would therefore have
+**trained the control, on seed 0, and written the result out as C3** — no error,
+no warning, no missing file, a perfectly normal-looking loss curve. This is
+exactly the failure ROADMAP's Phase 6 planning called the worst available in
+this phase, and it was already latent in committed configs.
+
+- **Decision:** condition configs now set `dataset.path: null` explicitly and
+  carry `dataset.path_template: "data/poisoned/{dataset_id}"`.
+  `src/nerf/training.py` raises on a null path rather than falling back.
+- **Decision:** the (condition, seed) → `dataset_id` rule lives in exactly one
+  place, `src/utils/dataset_id.py::dataset_id_for`, and
+  `scripts/build_poison_set.py` was refactored to call it. The code that writes
+  these datasets and the code that reads them can no longer drift into a mapping
+  that is self-consistently wrong. Verified the refactor is behaviour-preserving:
+  `C3_seed1` regenerates **byte-identically** (D-020's proof still holds).
+
+### The assertion: verification by content, not by path
+
+A path check cannot tell `data/poisoned/control` from `data/poisoned/C3_seed1` —
+both exist, both hold 100 valid PNGs, both load cleanly. So
+`resolve_dataset` checks the **data**: it counts how many training images
+actually differ byte-wise from the clean originals and asserts that count equals
+`round(budget/100 × |V_target|)`, then asserts the differing files are exactly
+the ones `MANIFEST.csv` marks poisoned. It also checks structure, manifest
+agreement (condition, `selection_seed`, row count), file-list agreement, and
+that the config's seed is the run's seed, and returns a SHA-256 digest of the
+resolved training set for the audit trail.
+
+Exercised against real data, all six representative (condition, seed) pairs pass
+and all three failure modes raise:
+
+| case | result |
+|---|---|
+| control/C1/C3/C5/C6/C7 at real seeds | **PASS** — 0 / 5 / 20 / 50 / 20 / 20 poisoned verified |
+| C3 pointed at `data/poisoned/control` | **RAISES** — "0 of 100 differ, must be 20 … signature of a WRONG DATASET" |
+| C3 seed 1 pointed at `C3_seed2` | **RAISES** — count matches (20) but the *identities* do not |
+| config seed 9 vs run seed 1 | **RAISES** |
+
+The wrong-seed case is the one that justifies the design: the poisoned **count**
+was correct, so any count-only or path-only check would have passed it.
+
+### Finding 2 — the condition configs could not train at all
+
+`configs/scenes/final_scene.yaml` carried **no `training:` or `optimizer:` block
+whatsoever**, so every condition inherited `configs/base.yaml`'s generic
+defaults. `training.netchunk` is absent from `base.yaml` entirely, and
+`_build_model` (`src/nerf/training.py:77`) reads `cfg["training"]["netchunk"]`
+inside the `network_query_fn` lambda — so the `KeyError` fires at the **first
+render call**, seconds into training, not at config load. No final-scene config
+had ever been run, so nothing had exercised the path.
+
+Full divergence from Phase 2's validated configuration (the only one this
+project has ever measured, at 31.550 dB against D-013's 29–33 dB range):
+
+| key | was (inherited) | now | why it mattered |
+|---|---|---|---|
+| `training.netchunk` | **absent** | 65536 | hard crash at first render |
+| `training.batch_size` | 4096 | **1024** | 4× compute/iteration |
+| `training.precrop_iters` | absent → 0 | 500 | silently no center-crop warmup |
+| `training.precrop_frac` | absent → 0.5 | 0.5 | — |
+| `optimizer.lr_decay_steps` | 250000 | 500000 | different LR schedule |
+| `render.use_viewdirs` / `perturb` / `raw_noise_std` | absent → code defaults | explicit | no longer depends on a `.get()` fallback |
+
+- **Decision (project lead): `batch_size: 1024`**, matching Phase 2's validated
+  run and the original NeRF paper's published Blender-scene setting
+  (`yenchenlin/nerf-pytorch` `configs/lego.txt`, vendored per D-005).
+- **Compute consequence, which is why this is a decision and not a typo fix:**
+  Phase 2 measured 4.66 iter/s at batch 1024. At 4096 the 24-run sweep projects
+  to **~890 GPU-hours (37 days)**; at 1024 it is ~4× cheaper, which is what
+  brings the phase into range at all. The exact figure depends on the iteration
+  count, which Step 1's convergence probe measures rather than assumes.
+- `iterations` and `lr_decay_steps` are locked **together** by that probe: a
+  short run under a long decay schedule never reaches a low learning rate (at
+  50k iterations with `lr_decay_steps: 500000` the LR decays only to 0.63× of
+  initial), so choosing one without the other is a bug.
+
+### Finding 3 — a YAML duplicate key silently deleted half a config
+
+While adding the `training:` block above, a second top-level `render:` key was
+appended to `configs/scenes/final_scene.yaml`. `yaml.safe_load` accepts
+duplicate keys **silently and keeps only the last**, so the entire Blender
+render section vanished from the resolved config — `resolution`, `samples`,
+`view_transform`, `mask_color_depth`, and
+`background_plate.mask_dilation_px`, the 3 px value locked by D-024 and
+referenced by `METHODOLOGY.md` §3. Nothing raised. It was caught only by
+checking the resolved values rather than trusting the edit.
+
+- **Fixed occurrence:** those keys now live under the existing `render:` block.
+- **Fixed failure mode:** `src/utils/config.py` now loads through a
+  `_NoDuplicatesLoader` that **raises** on any duplicate mapping key, naming the
+  key and both locations. Verified it fires on a synthetic duplicate and that
+  all 14 existing configs still load unchanged. Configs are this project's
+  single source of truth (`CLAUDE.md`); a config that silently loses half its
+  content is a correctness failure, not a style one. This is the same discipline
+  as D-030's manifest-schema guard — fix the class, not the instance.
+
+### Finding 4 — auto-resume already exists, and is silently unsafe
+
+`src/nerf/training.py:207–216` scans the run directory for `*.tar` and reloads
+the newest **unconditionally**. Three properties, established by reading the
+code path:
+
+1. **Silent.** Any re-run into a populated run directory continues instead of
+   restarting. Across 24 programmatically-named runs that is a live hazard.
+2. **RNG state is not checkpointed.** `set_seed` runs before the reload and
+   nothing restores numpy's state, so a resumed run draws a **different
+   training-view sequence** after the resume point. **A resumed run is not
+   equivalent to an uninterrupted one** and must be logged as such.
+3. **Off-by-one:** the checkpoint stores `global_step` before the `+= 1`, so the
+   saved value is `i-1` and resume re-runs iteration `i`. Harmless; recorded so
+   it is not later mistaken for a bug. The LR schedule restores correctly, being
+   a pure function of `global_step`.
+
+- **Decision: restart-clean by default.** `scripts/train.py` refuses to start
+  into a run directory containing checkpoints unless `--resume` is passed. With
+  `--resume`, `summary.json` records `resumed: true`, the checkpoint resumed
+  from, and property (2) verbatim, so a resumed run is honestly distinguishable
+  in the audit trail.
+- **Also added:** `scripts/train.py` refuses a **dirty working tree** without
+  `--allow-dirty`. Every `results.csv` row must trace to a commit hash
+  (`PROJECT_STRUCTURE.md`), which is meaningless if the tree has uncommitted
+  changes.
+
+### Supporting Step 0 measurements (no action needed)
+
+- **Dataset→run mapping is correct:** `MANIFEST.csv` holds exactly 2000 rows /
+  20 datasets; `control` and `C7` carry an empty `selection_seed` and one
+  directory each, C1–C6 three each, poisoned counts 0/5/10/20/30/50 exact.
+  Note the asymmetry: `control` and `C7` have **one dataset but three runs**, so
+  `run_id` carries the seed even where `dataset_id` does not.
+- **Storage is a non-issue:** checkpoints are 14.35 MB each (architecture-fixed);
+  24 runs with saved eval renders project to ~2–3 GB against **922 GB** free.
+  Retention: keep the final checkpoint, the tensorboard event file, `curves.csv`
+  and the saved eval renders per run; delete intermediate checkpoints once that
+  run's divergence check passes.
+- **`--skip-final-eval` (D-019) is wired and functional** end to end; the sweep
+  always passes it and evaluates in a separate process, per D-016.
+- **`data/poisoned/control/train` is byte-identical to
+  `data/blender_scenes/train`** (`diff -rq` clean), correct for a 0% budget and
+  the property that makes the content assertion discriminating.
+- **A fourth brace-glob scaffold directory** exists at
+  `experiments/{logs,results}/` — empty, never git-tracked, same unexpanded-brace
+  bug as D-011 and D-014. Removed.
+
+### Not resolved here: cloud parity
+
+`METHODOLOGY.md`-independent, but load-bearing for the sweep. Colab/Kaggle
+parity **could not be verified** in this session — no browser or cloud-account
+access — so it is reported rather than worked around, and the project lead will
+establish access if the sweep needs cloud capacity.
+
+One real finding from the pinned spec regardless of who runs the check:
+`environment/requirements.txt` pins `torch==2.14.0+cu130`,
+`torchvision==0.29.0+cu130` and a full `nvidia-*` cu13 tree via
+`--extra-index-url .../whl/cu130`, while `environment/SETUP.md` §2.1 states that
+the **cu128 floor** (not the cu130 pin) is what applies on cloud. The file
+encodes an exact pin, not a floor, so a literal `pip install -r requirements.txt`
+on a non-Blackwell cloud GPU would force a multi-GB torch replacement. **The
+sweep is therefore planned local-first**, with Step 1's measured wall-clock
+deciding whether cloud capacity is needed at all.
+
+- **Reversibility:** the config values are all changeable until the sweep's first
+  run starts, and none of them touch frozen data. `batch_size`, `iterations` and
+  `lr_decay_steps` become expensive to change once runs exist, since
+  cross-condition comparability depends on them being identical across all 24.

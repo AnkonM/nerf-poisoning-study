@@ -249,6 +249,21 @@ render:
     method: hide_render
     mask_dilation_px: 3          # D-024, set from pilot evidence (see entry)
 
+  # ---- NeRF renderer (distinct from the Blender renderer above) ---------
+  # Stated explicitly rather than relying on src/nerf/training.py's .get()
+  # fallbacks -- per CLAUDE.md, a number that affects a result lives in a
+  # config. These equal the current code defaults, so making them explicit
+  # changes no behaviour; it means a future change to those defaults cannot
+  # silently alter this study's runs.
+  #
+  # They MUST live under this existing `render:` key. A second top-level
+  # `render:` block is a YAML duplicate key, and yaml.safe_load silently keeps
+  # only the last one -- which while drafting D-032 wiped this entire Blender
+  # block, `background_plate.mask_dilation_px` included, with no error at all.
+  use_viewdirs: true
+  perturb: 1.0                    # stratified sampling jitter
+  raw_noise_std: 0.0              # no density-noise regularization
+
 # ---- V_target visibility threshold --------------------------------------
 # METHODOLOGY.md §2's per-view minimum-visibility constant: the fraction of
 # frame pixels the target's mask must cover for a view to count toward V_target.
@@ -288,5 +303,42 @@ dataset:
   near: 1.5
   far: 9.0
 
+# ---- NeRF training hyperparameters ----------------------------------------
+# ADDED in Phase 6 Step 1 (D-032). This file previously carried NO training or
+# optimizer block at all, so every condition config inherited configs/base.yaml's
+# generic defaults. Those differ from the only configuration this project has
+# ever validated -- Phase 2's clean-Lego run (configs/scenes/lego_sanity.yaml),
+# which reached 31.550 dB against D-013's 29-33 dB range -- and two of them were
+# actively wrong:
+#
+#   * `netchunk` is absent from base.yaml entirely, and src/nerf/training.py's
+#     _build_model reads cfg["training"]["netchunk"] unconditionally inside the
+#     network_query_fn lambda. Every final-scene config therefore raised KeyError
+#     at its FIRST render call, seconds into training. Nothing had ever exercised
+#     this path, because no final-scene config had ever been trained.
+#   * base.yaml's batch_size 4096 is 4x Phase 2's 1024, i.e. 4x the compute per
+#     iteration -- ~890 GPU-hours over 24 runs instead of ~220.
+#
+# The values below match Phase 2's validated configuration, which is also the
+# original NeRF paper's published Blender-scene setting (yenchenlin/nerf-pytorch
+# configs/lego.txt, vendored per D-005). METHODOLOGY.md §1-§7 say nothing about
+# training hyperparameters, so this is a config decision logged in D-032, NOT a
+# protocol deviation -- §10 stays empty.
+#
+# `iterations` (inherited: 200000) and `lr_decay_steps` are locked TOGETHER by
+# the Step 1 convergence probe -- a short run under a long decay schedule never
+# reaches a low learning rate, so choosing one without the other is a bug.
+training:
+  batch_size: 1024                # lego.txt N_rand; was base.yaml's 4096
+  netchunk: 65536                 # points per network forward pass (1024*64)
+  precrop_iters: 500              # lego.txt precrop_iters -- center-crop warmup
+  precrop_frac: 0.5               # lego.txt precrop_frac
+
+optimizer:
+  lr_decay_steps: 500000          # lego.txt lrate_decay=500 (thousand steps)
+
 reproducibility:
+  # Overridden per run by the sweep harness from the condition config's own
+  # `seeds:` list (METHODOLOGY.md §8 requires seeds 1/2/3, recorded per run).
+  # This value applies only to direct single-run invocations on the clean scene.
   seed: 0

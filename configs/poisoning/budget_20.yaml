@@ -26,8 +26,22 @@ poisoning:
 seeds: [1, 2, 3]
 
 dataset:
-  # train comes from this condition's own poisoned directory (resolved per seed
-  # by scripts/build_poison_set.py as data/poisoned/<dataset_id>/).
+  # `path` is explicitly NULL, and that is load-bearing (D-032).
+  #
+  # Until Phase 6 this key was simply absent here, which meant it was INHERITED
+  # from ../scenes/final_scene.yaml as `data/blender_scenes` — the clean scene.
+  # Every condition config therefore resolved to the unpoisoned training set,
+  # and `scripts/train.py configs/poisoning/budget_20.yaml` would have trained
+  # the control while labelling the result C3, with no error and no warning.
+  # Setting it null makes that silent path impossible: src/nerf/training.py
+  # raises rather than falling back to a scene-wide default.
+  #
+  # The real training set is resolved per (condition, seed) from the template
+  # below by src/utils/dataset_id.py, which then verifies the resolved directory
+  # by CONTENT — asserting that exactly round(budget/100 × |V_target|) of its
+  # images differ from the clean originals — before a single gradient step runs.
+  path: null
+  path_template: "data/poisoned/{dataset_id}"
   # val and the FROZEN eval_holdout are read straight from their single
   # canonical location — never copied or symlinked per condition (D-028).
   val_path: data/blender_scenes

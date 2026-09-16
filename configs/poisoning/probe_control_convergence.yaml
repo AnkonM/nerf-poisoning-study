@@ -1,0 +1,32 @@
+# Phase 6 Step 1 — control convergence probe (D-032, ROADMAP.md Phase 6).
+#
+# NOT a paper condition and NOT one of METHODOLOGY.md §5's eight conditions.
+# This config exists to answer one question before the 24-run sweep starts:
+# WHERE DOES THIS SCENE'S TRAINING CURVE ACTUALLY FLATTEN?
+#
+# D-018's 30,000 iterations was explicitly scoped to the Phase 3 Lego PoC and
+# sets no precedent; the final scene needs its own convergence check against its
+# own reference, analogous to D-013's pre-committed range for Lego. The answer
+# governs all 24 runs and is not changeable afterward without destroying
+# cross-condition comparability, so it is measured here rather than assumed.
+#
+# It trains the real control dataset (data/poisoned/control, byte-identical to
+# the clean training split) at a deliberately generous iteration count, with
+# val evaluation 4x more frequent than the sweep will use so the curve has
+# enough resolution to locate the knee.
+#
+# Run with an explicit --run-id so it does not collide with the sweep's own
+# `control_seed1`, which is a separate, shorter run at the locked count:
+#
+#   python scripts/train.py configs/poisoning/probe_control_convergence.yaml \
+#       --seed 1 --run-id probe_control_convergence --skip-final-eval
+
+defaults:
+  - budget_00.yaml
+
+training:
+  # Generous on purpose — the point is to see the plateau, not to stop at it.
+  iterations: 100000
+
+logging:
+  eval_every: 2500        # 40 val points across the run (sweep default: 10000)

@@ -45,6 +45,7 @@ from data_pipeline.scene_validation import read_mask
 from poisoning.compositor import composite
 from poisoning.view_selection import sample_random, sample_strategic
 from utils.config import load_config
+from utils.dataset_id import dataset_id_for, is_seed_invariant
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MANIFEST_PATH = os.path.join(REPO_ROOT, "data", "poisoned", "MANIFEST.csv")
@@ -107,8 +108,11 @@ def build_one(cfg, seed, scene_root, cameras_path):
     v_target_names = cams["v_target"]["views"]
     v_target = sorted(int(n.split("_")[1]) for n in v_target_names)
 
-    seed_invariant = (budget == 0) or (method == "strategic")
-    dataset_id = condition_id if seed_invariant else "%s_seed%d" % (condition_id, seed)
+    # Shared with the Phase 6 sweep harness (src/utils/dataset_id.py) so the
+    # code that WRITES these datasets and the code that READS them cannot drift
+    # into a mapping that is self-consistently wrong.
+    seed_invariant = is_seed_invariant(budget, method)
+    dataset_id = dataset_id_for(condition_id, budget, method, seed)
 
     if budget == 0:
         selected, n_poisoned = [], 0
@@ -188,8 +192,8 @@ def main():
     for s in seeds:
         dataset_id, n, sel = build_one(cfg, s, args.scene_root, cameras_path)
         built.append(dataset_id)
-        if (cfg["poisoning"]["budget_percent"] == 0
-                or cfg["poisoning"]["view_selection"] == "strategic"):
+        if is_seed_invariant(cfg["poisoning"]["budget_percent"],
+                             cfg["poisoning"]["view_selection"]):
             break        # seed-invariant: one dataset covers every seed
     print("[%s] built: %s" % (cfg["condition_id"], ", ".join(built)))
 

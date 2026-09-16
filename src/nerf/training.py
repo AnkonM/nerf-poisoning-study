@@ -173,6 +173,16 @@ def train_from_config(
             "(see this module's docstring)."
         )
 
+    if not dataset_cfg.get("path"):
+        raise ValueError(
+            "dataset.path is not set. Condition configs deliberately set it to "
+            "null (D-032): the training set is resolved per (condition, seed) "
+            "and verified by src/utils/dataset_id.py before training starts. "
+            "Run this config through scripts/train.py --seed N, which does that "
+            "resolution, rather than relying on an inherited scene-wide default "
+            "— that default was data/blender_scenes, the CLEAN scene."
+        )
+
     images, poses, hwf, i_split = load_blender_data(
         dataset_cfg["path"],
         half_res=dataset_cfg.get("half_res", False),

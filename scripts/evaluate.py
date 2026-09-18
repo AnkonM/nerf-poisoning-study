@@ -25,6 +25,9 @@ import torch
 from nerf.datasets.blender import load_blender_data
 from nerf.training import _build_model, _render_kwargs, device, evaluate_psnr
 from utils.config import load_config
+from utils.dataset_id import resolve_dataset
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
 def main() -> None:
@@ -32,12 +35,31 @@ def main() -> None:
     parser.add_argument("config", help="Path to the config YAML used to train the checkpoint")
     parser.add_argument("checkpoint", help="Path to a .tar checkpoint file")
     parser.add_argument("--run-id", default=None, help="Label for the output summary file")
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="Required for condition configs (dataset.path is null there, per "
+        "D-032) -- selects which poisoned dataset's train split to resolve. "
+        "Only the test/val splits are actually scored, but load_blender_data "
+        "still needs a real train/ directory + transforms_train.json to load.",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
     run_id = args.run_id or os.path.splitext(os.path.basename(args.checkpoint))[0]
 
     dataset_cfg = cfg["dataset"]
+    if dataset_cfg.get("path_template"):
+        if args.seed is None:
+            sys.exit(
+                "--seed is required: this config resolves dataset.path per "
+                "(condition, seed) rather than carrying a literal path (D-032)."
+            )
+        cfg["reproducibility"]["seed"] = args.seed
+        info = resolve_dataset(cfg, args.seed, repo_root=REPO_ROOT)
+        dataset_cfg = dict(dataset_cfg, path=os.path.join(REPO_ROOT, info["dataset_path"]))
+        print("Dataset VERIFIED: %s (%d/%d views poisoned) sha256=%s"
+              % (info["dataset_id"], info["n_poisoned_verified"], info["n_train_views"],
+                 info["train_set_sha256"][:16]))
     print(f"Loading dataset: {dataset_cfg['path']} (testskip={dataset_cfg.get('testskip', 1)})")
     images, poses, hwf, i_split = load_blender_data(
         dataset_cfg["path"],

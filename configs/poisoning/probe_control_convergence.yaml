@@ -25,8 +25,20 @@ defaults:
   - budget_00.yaml
 
 training:
-  # Generous on purpose — the point is to see the plateau, not to stop at it.
-  iterations: 100000
+  # Extended 100000 -> 150000 (2026-09-18). The 5-view val-subset curve
+  # LOOKED flat from ~60k on, but full 75-view eval-set PSNR measured
+  # independently at 25k/50k/75k/100k showed NO plateau: gains per 10k block
+  # were +0.858 / +0.312 / +0.479 dB, i.e. still rising at the last point
+  # measured, with 75k->100k gaining MORE than 50k->75k. The 5-view proxy was
+  # actively misleading here (it read a spurious plateau, even a fake -0.6 dB
+  # "drop" at 100k, that the real metric does not show). Extending rather than
+  # locking an iteration count off a curve that was still visibly climbing.
+  iterations: 150000
 
 logging:
-  eval_every: 2500        # 40 val points across the run (sweep default: 10000)
+  eval_every: 2500          # 40 val points across the run (sweep default: 10000)
+  # Tightened 25000 -> 12500 for the 100k-150k extension so intermediate
+  # checkpoints exist to measure the REAL full-eval-set PSNR against, not just
+  # the noisy 5-view proxy that misled the first read of this curve. Lands
+  # saves at 112500 / 125000 / 137500 / 150000.
+  checkpoint_every: 12500

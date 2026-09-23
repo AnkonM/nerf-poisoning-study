@@ -1911,3 +1911,166 @@ deciding whether cloud capacity is needed at all.
   run starts, and none of them touch frozen data. `batch_size`, `iterations` and
   `lr_decay_steps` become expensive to change once runs exist, since
   cross-condition comparability depends on them being identical across all 24.
+
+## D-033 — Phase 6 Step 1: control convergence probe locks iterations=200,000 for the sweep
+
+- **Date:** 2026-09-19
+- **Decision:** the 24-run sweep trains for **200,000 iterations**, matching
+  Phase 2's own count (D-016) exactly. `optimizer.lr_decay_steps` stays at
+  **500,000** (already set in `configs/scenes/final_scene.yaml` per D-032,
+  identical to Phase 2's `lego_sanity.yaml`) — no further config change is
+  needed, since it already matches this lock. `training.batch_size` stays at
+  **1024** (also already locked in D-032). Nothing here is a new config edit
+  to the 8 real condition configs; this entry records the evidence for values
+  that were already in place, and rules out reopening them.
+- **Why this needed real investigation rather than a default:** D-018
+  explicitly scoped 30,000 iterations to the Phase 3 Lego PoC and set no
+  precedent; this scene had never been trained to any iteration count before
+  Phase 6. `configs/base.yaml`'s own default of 200,000 happened to be present
+  the whole time, but that is a coincidence of the scaffold, not evidence it
+  was the right number for this scene — it required checking, not assuming.
+- **The 5-view TensorBoard proxy actively misled the first read of this
+  curve.** `evaluate_psnr`'s periodic in-training check (`src/nerf/training.py`)
+  scores only `i_val[:5]` for cost reasons. Read at 25k/50k/.../100k it looked
+  flat from ~60k on (44.5 -> 45.4 -> 45.7 -> 46.0 -> 47.0 -> 46.4 dB, the last
+  point even reading as a drop) — exactly the signature of a plateau.
+- **The real metric — full 75-view frozen `eval_holdout` PSNR via
+  `scripts/evaluate.py`, independently measured at every saved checkpoint —
+  told a different story entirely,** durably recorded at
+  `experiments/results/phase6/probe_control_convergence/full_eval_set_psnr.csv`:
+
+  | iteration | full eval-set PSNR | Δ per 10k block |
+  |---|---|---|
+  | 25,000 | 43.460 | — |
+  | 50,000 | 45.605 | +0.858 |
+  | 75,000 | 46.386 | +0.312 |
+  | 100,000 | 47.583 | +0.479 |
+  | 112,500 | 48.184 | +0.481 |
+  | 125,000 | 49.025 | +0.673 |
+  | 137,500 | 48.765 | −0.208 |
+  | 150,000 | 50.069 | +1.043 |
+  | 162,500 | 49.315 | −0.603 |
+  | 175,000 | 50.217 | +0.722 |
+  | 187,500 | 50.416 | +0.159 |
+  | 200,000 | 50.778 | +0.290 |
+
+  No plateau anywhere through 150,000 — the 75k->100k block gained MORE per
+  10k than 50k->75k did, the opposite of what the 5-view proxy suggested.
+  Locking on the 5-view curve at any point in the 50k-100k range investigated
+  earlier in this phase would have baked an under-converged model into all
+  24 sweep runs.
+- **The 137,500 dip is verified REAL SGD-run variance, not evaluation noise.**
+  `evaluate.py`'s test-time render has `perturb: 0.0` and `raw_noise_std: 0.0`
+  (`src/nerf/training.py::_render_kwargs`), so a fixed checkpoint against
+  fixed poses/images should be deterministic. Re-running the eval on the
+  identical `137500.tar` checkpoint twice, independently, produced
+  bit-identical **48.765 dB both times**. So checkpoint-to-checkpoint swings
+  of roughly ±0.5-1 dB from ordinary SGD noise sit on top of the real trend,
+  and any single-checkpoint lock carries some of this regardless of where
+  training stops.
+- **The knee is real and arrives at 150,000-200,000, not earlier.** Marginal
+  gain per 10k-iteration block: ~0.55 dB/10k averaged over 25k-100k, ~0.5
+  dB/10k averaged over 100k-150k (no slowdown there), then ~0.14 dB/10k
+  averaged over 150k-200k — a genuine ~3-4x drop in marginal return, the
+  first sustained deceleration anywhere in the curve (187.5k and 200k are the
+  first two CONSECUTIVE blocks both under +0.3 dB/10k).
+- **No overfitting.** Final train-batch PSNR at 200,000 iterations: 53.616 dB
+  (`experiments/runs/probe_control_convergence/summary.json`). Final full
+  eval-set PSNR: 50.778 dB. The eval curve rose monotonically in its overall
+  trend throughout (individual-checkpoint noise aside) with no divergence
+  between train and eval quality opening up — train stays modestly ahead of
+  eval throughout, the expected pattern for a converging, non-overfit model,
+  not a widening gap.
+- **Alternatives considered:** locking earlier (50k, the recommendation made
+  before the real metric was checked — rejected once the real curve showed no
+  plateau there, see below); locking at 150,000 (rejected — 150k->200k still
+  gained +0.7 dB, a genuine improvement worth the extra ~1/3 compute given the
+  sweep is a one-time cost); extending past 200,000 to chase a fully flat 25k+
+  block (not ruled out as strictly better, but not pursued — compute cost
+  compounds with every extension, at 200k the deceleration is already the
+  clearest signal seen in the whole curve, and 200,000 has the independent
+  merit of exactly matching Phase 2's own count, D-016, removing any argument
+  that the sweep was trained to a different standard than the pipeline's own
+  validated baseline).
+- **Compute consequence:** at the measured ~5.9-6.5 it/s local rate, ~9.4
+  h/run -> **~226 GPU-hours (~9.4 days) for the 24-run sweep.** This is the
+  real cost of the decision and should not be understated; it is
+  substantially more than the ~56.5 h projected for the 50k figure floated
+  earlier in this investigation, before the real metric ruled 50k out.
+- **Correcting an earlier statement in this project's own record:** the Step
+  1 pause-point report mid-investigation recommended 50,000 iterations,
+  based on the 5-view proxy's apparent plateau. That recommendation is
+  superseded by this entry and was never acted on — no sweep run was ever
+  launched at 50k. Recorded here rather than silently dropped, since an
+  append-only log is supposed to show the correction, not just the final
+  answer.
+- **Reversibility:** the config values are unchanged from D-032 (already
+  correct); this entry only adds the evidence base and formally closes the
+  question. Changing the iteration count after any sweep run has started
+  would invalidate cross-condition comparability and require reopening this
+  entry with a new one, not editing it.
+
+## D-034 — Phase 6: this scene's control PSNR is not comparable to Lego's, and must not be reported as if it were
+
+- **Date:** 2026-09-19
+- **Finding:** the final scene's clean-control full eval-set PSNR at
+  convergence (200,000 iterations) is **50.778 dB** — nearly 20 dB above
+  Phase 2's clean-Lego reference of **31.550 dB** (D-016).
+- **This is not a pipeline improvement and not a result to compare against
+  published NeRF numbers.** It reflects the final scene's own
+  characteristics relative to Lego's: fewer distinct surfaces, smoother
+  materials (D-022's diffuse-only, opaque-only scene brief), a smaller and
+  more centrally-framed target with simpler geometry than Lego's fine
+  lattice structure, and a training-view rig specifically constructed so
+  every view clears a comfortable visibility margin on the target (D-025).
+  A scene this much easier to fit trivially reaches a higher absolute PSNR
+  under an identical model and training budget; the number says nothing
+  about whether the pipeline, the poisoning mechanism, or anything else in
+  this study is working better than it was on Lego.
+- **Binding constraint for Phase 8/10 (do not lose this):** every Phase 6/7
+  result must be reported as **relative degradation from this scene's own
+  control** (e.g. "masked PSNR dropped X dB from the 0% control" or "X% of
+  the control's masked PSNR retained"), exactly as Phase 3's PoC already did
+  correctly (control/20%/50% masked PSNR 23.6/19.4/11.6 dB, D-017-D-020).
+  **Absolute PSNR figures from this study must never be placed side-by-side
+  with published NeRF-paper numbers (32.54 dB Lego, etc., D-013) as if they
+  were measuring the same thing** — they are not comparable scenes, and doing
+  so would misrepresent the poisoning effect as a scene-quality effect or
+  vice versa.
+- **Alternatives considered:** none — this is a finding to carry forward
+  correctly, not a decision with alternatives. Flagged now, before Phase 8
+  analysis exists, specifically so it cannot be silently forgotten once the
+  numbers are in a spreadsheet without this context attached.
+- **Reversibility:** n/a — a measured property of this scene, not a
+  decision.
+
+## D-035 — `scripts/evaluate.py` had the same dataset-resolution defect D-032 fixed in `train.py`
+
+- **Date:** 2026-09-18
+- **Finding:** `evaluate.py` read `dataset_cfg["path"]` directly with no
+  resolution step for condition configs. Since D-032 set `dataset.path: null`
+  on every condition config (precisely so a bare inherited default could
+  never be silently used), running `evaluate.py` against a checkpoint trained
+  under a condition config would have crashed outright — or, had `path` still
+  carried a stale literal value from before D-032, silently evaluated against
+  the wrong dataset's train split with no error. Same failure class as the
+  0a finding in D-032, in a second call site that Step 0's original audit did
+  not check because Phase 6 had not yet needed to *evaluate* a condition
+  checkpoint.
+- **Decision:** `evaluate.py` now takes `--seed` and, for configs carrying
+  `dataset.path_template`, resolves and verifies the dataset through the same
+  `src/utils/dataset_id.py::resolve_dataset` content assertion `train.py`
+  uses — the same check, not a parallel reimplementation, so the two call
+  sites cannot drift apart in what they consider "correct."
+- **Verified working, not just written:** used for real to produce every
+  full-eval-set PSNR figure in D-033's table above. All twelve invocations
+  (one per checkpoint) passed the dataset assertion against the real
+  `control` dataset and produced independently reproducible numbers (the
+  137,500 repeat measurement in D-033 came from a second, independent
+  invocation of this fixed code path).
+- **Already committed:** `7d76c0d`, 2026-09-18 — this entry documents the
+  decision retroactively, matching this project's discipline of every
+  non-trivial change having a dated rationale, even when the commit slightly
+  preceded the log entry within the same investigation.
+- **Reversibility:** additive and covered by the same real usage that
+  produced D-033's data; no design decision beyond D-032's own is introduced.

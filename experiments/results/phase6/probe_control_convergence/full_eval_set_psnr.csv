@@ -1,0 +1,13 @@
+iteration,full_eval_set_psnr_db,n_eval_views,notes
+25000,43.460,75,
+50000,45.605,75,
+75000,46.386,75,
+100000,47.583,75,
+112500,48.184,75,
+125000,49.025,75,
+137500,48.765,75,repeated evaluation on same checkpoint independently confirmed bit-identical 48.765 -- this dip is real SGD-run variance, not eval measurement noise
+150000,50.069,75,
+162500,49.315,75,
+175000,50.217,75,
+187500,50.416,75,
+200000,50.778,75,final checkpoint; iterations=200000 locked (D-033)

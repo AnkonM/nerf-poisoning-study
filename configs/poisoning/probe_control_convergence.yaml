@@ -25,15 +25,25 @@ defaults:
   - budget_00.yaml
 
 training:
-  # Extended 100000 -> 150000 (2026-09-18). The 5-view val-subset curve
-  # LOOKED flat from ~60k on, but full 75-view eval-set PSNR measured
-  # independently at 25k/50k/75k/100k showed NO plateau: gains per 10k block
-  # were +0.858 / +0.312 / +0.479 dB, i.e. still rising at the last point
-  # measured, with 75k->100k gaining MORE than 50k->75k. The 5-view proxy was
-  # actively misleading here (it read a spurious plateau, even a fake -0.6 dB
-  # "drop" at 100k, that the real metric does not show). Extending rather than
-  # locking an iteration count off a curve that was still visibly climbing.
-  iterations: 150000
+  # Extended 100000 -> 150000 -> 200000 (2026-09-18/19). The 5-view
+  # val-subset curve LOOKED flat from ~60k on, but full 75-view eval-set PSNR
+  # -- the real metric -- showed NO plateau through 150000:
+  #
+  #   25k  43.460   50k  45.605 (+0.858/10k)   75k  46.386 (+0.312/10k)
+  #  100k  47.583 (+0.479/10k)  112.5k 48.184 (+0.481/10k)
+  #  125k  49.025 (+0.673/10k)  137.5k 48.765 (-0.208/10k, see below)
+  #  150k  50.069 (+1.043/10k)
+  #
+  # The 137.5k dip was verified REAL, not measurement noise: evaluate.py's
+  # test-time render has perturb=0.0 and raw_noise_std=0.0, so re-running the
+  # eval on the SAME 137500.tar checkpoint twice produced bit-identical
+  # 48.765 dB both times. So checkpoint-to-checkpoint variance of roughly
+  # +-0.5-1 dB from ordinary SGD noise sits on top of a curve that was still
+  # climbing at 150k, faster than at 75k-100k, not slower. Extending again
+  # rather than locking on a curve with no observed knee, to 200000 -- Phase
+  # 2's own iteration count (D-016, 31.550 dB on Lego) -- as the next real
+  # data point, not a number picked in advance.
+  iterations: 200000
 
 logging:
   eval_every: 2500          # 40 val points across the run (sweep default: 10000)

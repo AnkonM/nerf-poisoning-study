@@ -155,6 +155,14 @@ def main():
         print("   ! %s" % rel)
     print("recorded aggregate : %s" % recorded_agg)
     print("recomputed aggregate: %s" % agg)
+    # Non-failing: git does not preserve the read-only bit (D-026), so a fresh
+    # clone leaves transforms_test.json writable. Content is what --verify gates.
+    writable = [rel for rel, _ in entries
+                if os.stat(os.path.join(args.root, rel)).st_mode
+                & (stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)]
+    if writable:
+        print("WARNING: %d frozen file(s) are writable (D-026 says read-only), "
+              "e.g. %s — see environment/SETUP.md" % (len(writable), writable[0]))
     ok = (not missing and not extra and not changed and agg == recorded_agg)
     print("VERIFY: %s" % ("PASS — byte-for-byte identical" if ok else "FAIL"))
     return 0 if ok else 1

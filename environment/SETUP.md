@@ -227,3 +227,19 @@ wslpath -w /home/ankon/projects/nerf-poisoning-study/data
   OptiX in Preferences, and `blender.exe --background scene.blend --python
   scripts/render_scene.py` runs successfully from a Windows terminal
   (needed for Phase 4's scripted scene rendering).
+
+## 5. Frozen eval set: re-apply read-only permissions after a fresh clone
+
+D-026 froze `data/blender_scenes/transforms_test.json` (plus the three
+`eval_holdout/` directories) as read-only. Git stores only the executable bit,
+not write permission, so a fresh clone leaves `transforms_test.json`
+**writable** even though it is part of the frozen 226-file set. After every
+fresh clone (and after restoring the ignored-files zip), run:
+
+```bash
+chmod a-w data/blender_scenes/transforms_test.json
+python scripts/freeze_eval_set.py --verify   # must report PASS
+```
+
+`--verify` prints a non-failing `WARNING` while any frozen file is still
+writable; the PASS/FAIL verdict depends on content only.

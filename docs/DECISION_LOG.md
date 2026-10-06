@@ -2074,3 +2074,71 @@ deciding whether cloud capacity is needed at all.
   preceded the log entry within the same investigation.
 - **Reversibility:** additive and covered by the same real usage that
   produced D-033's data; no design decision beyond D-032's own is introduced.
+
+## D-036 — Post-migration housekeeping (repo moved to the native Ubuntu 24.04 machine)
+
+- **Date:** 2026-10-06
+- **Scope:** fixes forced by moving the project from the Windows/WSL2 laptop to
+  a native Ubuntu 24.04 machine (Quadro RTX 5000). Nothing here touches
+  `METHODOLOGY.md` §1–§7, any value locked in D-032–D-035, or any frozen data;
+  §10 stays empty. Migration verification (restore from the ignored-files
+  zip, `freeze_eval_set.py --verify` PASS with aggregate `211a5a59…5ab214`,
+  20 datasets byte-checked against `MANIFEST.csv`) was reported separately.
+
+### What was done (one commit each, none pushed)
+
+1. **Stale-path check.** `grep` for `/home/`, `/mnt/c`, `\\wsl`,
+   `wsl.localhost`, `C:\` over the repo excluding `.venv/`, `data/`, `.git/`
+   and `experiments/`. Hits and disposition:
+   - `environment/SETUP.md` §1/§3 (WSL2 and Windows-Blender instructions,
+     including an example `/home/ankon/...` path) — **left**: they document the
+     laptop and are not wrong, only not applicable here (§6 now says so).
+   - `docs/DECISION_LOG.md` (7 lines, D-021) — **left**: append-only.
+   - `scripts/render_scene.py`, `build_scene.py`, `build_camera_rig.py`:
+     `DEFAULT_BLENDER = "/mnt/c/Program Files/Blender Foundation/..."` —
+     **left**: Windows-Blender defaults, unused for Phase 6 (no renders), and
+     Blender is not installed here. Anyone re-running Phase 4 tooling must pass
+     an explicit Blender path.
+   - **One real defect, outside what the grep covers:** `.venv/bin/*` console
+     scripts carried the **old absolute path**
+     (`#!/home/hpc-sdb/nerf-poisoning-study/.venv/bin/python`) after the repo was
+     moved one directory deeper, and `uv sync --frozen` reports "up to date"
+     without rewriting them. `uv run python` worked only because it calls the
+     interpreter directly. Fixed by deleting the (git-ignored) `.venv` and
+     re-running `uv sync --frozen`; shebangs now point at the new location,
+     51 tests pass. Documented in SETUP.md §6.
+2. **Windows artifact removed.** `git rm docs/DECISION_LOG.md:Zone.Identifier`
+   (a download-marker file tracked by mistake); `*:Zone.Identifier` added to
+   `.gitignore`, verified with `git check-ignore -v`.
+3. **Frozen-set permissions.** `data/blender_scenes/transforms_test.json` is in
+   the frozen 226-file set but was writable, contradicting D-026 (git stores
+   no write bit, so a fresh clone cannot preserve it). `chmod a-w` applied;
+   `--verify` still PASS, same aggregate. `scripts/freeze_eval_set.py --verify`
+   now prints a **non-failing** `WARNING` if any frozen file is writable (content
+   alone still decides PASS/FAIL), and SETUP.md §5 says to re-apply the chmod
+   after every fresh clone.
+4. **`scripts/verify_env.py`.** The hard-coded `(12, 0)` capability comparison
+   (the RTX 5060's) is now an informational `NOTE`; the gate is CUDA available
+   plus a GPU matmul. Nothing else in the script changed beyond its docstring.
+5. **SETUP.md §6** documents this machine (hardware, driver, uv location,
+   chmod note, "no WSL2/Blender for Phase 6", git has no identity/credentials).
+   WSL2 sections were not deleted. `uv` lives in `~/.local/bin`; `~/.profile`
+   and `~/.bashrc` already put that directory on `PATH`, so **no profile edit
+   was made**.
+6. **`data/poisoned/phase3_poc_budget_{00,20,50}/` are full copies, not
+   symlinks** (the zip stored them dereferenced; ~241 MB each, real
+   `val/`, `test/`, `transforms_*.json`). They remain inert per D-030 — nothing
+   under `scripts/build_poison_set.py`, `src/` or the eight study configs reads
+   them. **Not deleted**, per instruction.
+
+### Process notes
+
+- This machine has no git identity, no credential helper and no SSH key
+  (`~/.ssh` holds only `authorized_keys`). Commits for this entry were made
+  with a per-command `-c user.name=AnkonM -c user.email=...` (nothing written to
+  any git config), and nothing was pushed. Pushing needs credentials set up by
+  the project lead.
+- `scripts/train.py` refuses a dirty working tree (D-032), so all of the above
+  had to be committed before any training could start.
+- **Reversibility:** all trivial; the only non-trivial one is item 1's venv
+  rebuild, which is regenerable from `uv.lock`.

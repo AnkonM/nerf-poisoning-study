@@ -2181,3 +2181,138 @@ deciding whether cloud capacity is needed at all.
   output path from the run's own `summary.json` and logs.
 - **Reversibility:** trivial — additive and default-preserving; removing the
   flag restores the old behaviour exactly.
+
+## D-038 — Phase 6 sweep platform: HPC machine (Quadro RTX 5000)
+
+- **Date:** 2026-10-06
+- **Decision (project lead):** **all** Phase 6 runs — the 24-run sweep
+  (8 conditions × 3 seeds, C7 included) — execute on this one machine, native
+  Ubuntu 24.04, Quadro RTX 5000 16 GB (Turing, sm_75), running continuously.
+  **Hardware is never mixed inside the sweep:** a different GPU changes
+  floating-point behaviour, which would add a hardware confound to every
+  between-condition comparison. The Windows/WSL2 laptop, rented cloud and
+  Colab/Kaggle are not part of the sweep. Nothing in `METHODOLOGY.md` §1–§7 or
+  D-032–D-035 changes (§10 stays empty).
+- **Alternatives considered:** the laptop (RTX 5060) at the D-033 estimate of
+  ~226 GPU-hours (~9.4 days) — rejected: it is a laptop that must not be tied up
+  for weeks, and mixing it with this machine is prohibited above; rented single-GPU
+  cloud — rejected: a different GPU and an environment-parity risk (below);
+  Colab/Kaggle — rejected for the same reasons, plus session limits.
+- **Constraint — no precision changes:** no AMP/fp16/TF32, and no change to
+  model, batch size (1024), iteration count (200,000), sample counts, near/far
+  or any other value locked in D-032–D-035. Throughput is whatever this
+  hardware gives at the validated settings.
+
+### Starting state of the machine (recorded so numbers are labelled)
+
+Measured 2026-10-06 16:57 IST, immediately before the training measurements;
+saved at `~/scratch/phase6_bench/start_state.txt`.
+
+- GPU persistence mode **Enabled**; driver 580.173.02; CPU governor
+  `performance` on all 24 cores; `powerprofilesctl` = `performance`.
+  (Earlier the same day, persistence was Disabled and the governor
+  `powersave`; the project lead changed these with sudo in between. Part C's
+  earlier "needs sudo" items for persistence mode are therefore done.)
+- `apt-mark showhold`: the NVIDIA 580 driver/library packages,
+  `linux-image/headers/generic-hwe-24.04` and `linux-modules-nvidia-580-*` are
+  held, so neither the driver nor the kernel can auto-upgrade mid-sweep.
+- GPU memory in use by the desktop: 588 MiB (Xorg 181, gnome-shell 137,
+  firefox 108, VS Code 102, others <15). The desktop was left running.
+- Storage: **the repo, `data/blender_scenes`, `data/poisoned`,
+  `experiments/runs` and the scratch directory are all on `/dev/sdb2`, a
+  rotational HDD (ROTA=1, ext4).** Checkpoints will therefore land on HDD. The
+  477 GB NVMe seen earlier in `lsblk` was no longer present at measurement time,
+  so no NVMe comparison was possible; `sda`/`sdc` have no mounted filesystem.
+
+### Measurements (control, seed 1, the real sweep config, `--skip-final-eval`, `--output-root` under scratch, `scripts/train.py` itself run via `runpy` so torch's peak-memory counters could be read at exit)
+
+Only `training.iterations` (and, where stated, `logging.log_every`/`eval_every`)
+differ from the real config, in scratch config copies that inherit it; no
+locked value changed.
+
+| item | result | status |
+|---|---|---|
+| B2 throughput, 4 windows of 500 it after the first 500 | 5.847, 5.831, 5.831, 5.829 → **median 5.831 it/s** | measured |
+| GPU-bound or CPU-bound | GPU util mean 96% (median 97%); training process CPU median 100% = one core spinning on CUDA sync → **GPU-bound** | measured |
+| Training-only peak VRAM | allocated 3,044 MiB, reserved 3,242 MiB; `nvidia-smi` per-process 3,396 MiB | measured |
+| **Peak VRAM including the in-training validation** (`eval_every: 10000`, 5 val views) | allocated 4,667 MiB, **reserved 8,434 MiB, `nvidia-smi` per-process 8,588 MiB**. A short run never reaches this; it appears at iteration 10,000 and persists in the caching allocator | measured (B3, B4) |
+| In-training validation cost | ~57 s each (143 s window vs 86 s normal); 20 per 200k-iteration run | measured |
+| Host RAM | process RSS ≤ 1,972 MiB single; ≤ 3,704 MiB with 2 processes; host used ≤ 6,968 MiB | measured |
+| Dataset load | whole dataset (185 × 400×400×4 float32, 0.47 GB) loaded into RAM at start in ~6.4 s; dataset content assertion included in the ~10 s startup | measured |
+| Checkpoint write (14.34 MB, `torch.save` + `fsync`, HDD) | 0.151–0.287 s, median 0.201 s; 8 checkpoints/run (every 25,000) ≈ 1.6 s | measured (HDD only) |
+| B3 sustained, 30.9 min, 10,500 it | first 5 min **5.854 it/s**; last clean 5 min (ending at iteration 10,000, before the validation pause) **5.847 it/s**; ratio **0.999**; every 500-it window 5.83–5.85, drifting *up* slightly | measured |
+| B3 thermals/power | temperature 52–82 °C (typically 79–82; GPU target 83 °C, slowdown 93 °C); SM clock median 1,845 MHz, 1,815–1,845 under load; power mean ~220 W, max 237 W against the 230 W limit; clock-event reason **only SW power cap (0x4)**, constant; no thermal (0x20) or hardware slowdown (0x8) in 186 samples | measured |
+| B4 two concurrent processes, 3 clean windows each | **2.763 it/s each, 5.527 aggregate = −5.2% vs B2**; GPU util 100% | measured |
+| B4 VRAM | per process `nvidia-smi` 6,358 and 8,588 MiB; **total 15,457 of 16,384 MiB (0.9 GB headroom)**; no OOM, but it is one overlapping validation away from one | measured |
+| B4 three processes | **not run**: 3 × the 8.6 GiB validation peak far exceeds the card, and two already fail the 2 GB headroom criterion | decision, not measured |
+| B5 same seed, two separate runs, 300 it, `log_every: 10` | train/loss and train/psnr: 30/30 points identical, **max abs diff 0.0**; final checkpoints byte-identical (SHA-256 prefix `1dbdbbca70c81ae1`) | measured |
+| B6 eval cost (earlier, D-036 session) | 10.9 s per 400×400 view → 75 views ≈ 13.6 min; peak eval VRAM 4.54 GiB | measured on 3 views, extrapolated to 75 |
+
+**B5, honestly framed (as D-027 did for renders):** on this machine, with
+`reproducibility.deterministic_cudnn: true` as already set in
+`configs/base.yaml` (the repo's own `set_seed` sets cudnn deterministic, benchmark
+off; no extra flags were added), two fresh same-seed runs were **bit-exact over
+300 iterations**. This does not show bit-exactness over 200,000 iterations, over
+the periodic validation, or across different GPUs/driver versions — the last
+being exactly why the single-machine rule exists. It does show a *restart from
+scratch* reproduces the original run on this machine, whereas a *resume* does not
+(open item below).
+
+### Projection (B7) — every figure labelled
+
+| quantity | value | status |
+|---|---|---|
+| training, 200,000 it at 5.84 it/s | 34,247 s = **9.51 h/run** | extrapolated from B2/B3 |
+| in-training validation, 20 × ~57 s | 0.32 h/run | extrapolated (57 s measured once ×20) |
+| final eval, 75 views × 10.9 s | 0.23 h/run | extrapolated (B6, 3 views) |
+| **per run, all-in** | **≈ 10.06 h** | extrapolated |
+| **24 runs, all-in** | **≈ 241 h ≈ 10.1 days** (training only: 228 h ≈ 9.5 days) | extrapolated |
+| second projection from B4's aggregate | **not given**: 5.527 it/s does not beat B2 (it is 5.2% *lower*) | — |
+
+Comparison with D-033's laptop figure: 5.9–6.5 it/s, ~9.4 h/run, **~226 h** for 24
+runs, which counts training only. Like-for-like (training only) this machine is
+**~228 h**, i.e. the same cost as the laptop's best case, with no thermal
+degradation over a 31-minute sustained run. Add ~0.55 h/run (13 h total) for
+validation and final evaluation, which D-033's figure did not include. Not
+measured: a multi-day run — a 31-minute sustained test does not exclude slow
+degradation (dust, ambient temperature, disk fill) over ~10 days.
+
+**Recommendation from the evidence:** run **one training process at a time**.
+Concurrency gives no throughput (−5%) and breaks the VRAM headroom criterion.
+Run `scripts/evaluate.py` after training, in a separate process, as D-016/D-019
+already require (its peak is 4.54 GiB; the in-process validation alone reaches
+8.4 GiB reserved).
+
+### OPEN ITEM — resume does not restore RNG state
+
+`src/nerf/training.py` reloads model weights, optimizer state and `global_step`
+from the newest checkpoint, but `set_seed` runs *before* the reload and numpy's
+RNG state is not checkpointed, so a resumed run's training-view and ray-sample
+sequence restarts from the seed instead of continuing (D-032, finding 4). A
+resumed run is therefore **not** equivalent to an uninterrupted one. Checkpoints
+are written every 25,000 iterations, so an interruption costs at most ~1.2 h of
+redone work if resumed, or up to a full run (~10 h) if restarted clean (which
+B5 shows reproduces the original bit-for-bit on this machine). **The sweep
+harness must record every resume per run** (`summary.json` already carries
+`resumed: true`, the checkpoint and the caveat). Whether to add RNG state
+(numpy, torch, CUDA) to checkpoints — which would make resume exact, at the
+price of a change to `src/nerf/training.py` — is **deferred**, and now has the
+B5 evidence it needed; it is a decision for the project lead, not made here.
+
+### Not resolved here
+
+- **Colab/Kaggle parity (the Phase 0 gate) remains UNVERIFIED**, and nothing in
+  this plan exercises it: the sweep never runs there. The cu128-floor vs
+  cu130-pin gap flagged in D-032 is moot for Phase 6 but still open for anyone
+  who later wants a cloud run (it would also fall under the single-machine rule).
+- **Git push is not configured** on this machine (no identity, credential helper
+  or SSH key). Commits for D-032–D-038 exist only in the local repository;
+  D-036 and D-037 were committed with a per-command identity
+  `AnkonM <ankonmuk@gmail.com>`. Losing this disk would lose them. Out of scope
+  for this task.
+- Throughput was measured with the desktop running (588 MiB VRAM and a little
+  GPU time). The sweep will see the same unless the desktop is stopped; that was
+  deliberately not done.
+- **Reversibility:** the platform can be changed only by restarting the sweep
+  from run 1 on the new hardware (single-machine rule); nothing about the
+  validated settings changes with it.

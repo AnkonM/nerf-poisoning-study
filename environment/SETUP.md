@@ -243,3 +243,33 @@ python scripts/freeze_eval_set.py --verify   # must report PASS
 
 `--verify` prints a non-failing `WARNING` while any frozen file is still
 writable; the PASS/FAIL verdict depends on content only.
+
+## 6. Native Ubuntu 24.04 HPC machine (Phase 6 sweep platform)
+
+Added after the repo moved off the WSL2 laptop (D-036). Sections 1–3 above
+describe the original laptop and remain accurate for it; this section
+describes the machine that runs Phase 6.
+
+- **OS / hardware:** native Ubuntu 24.04, kernel 7.0 (HWE), 24 threads
+  (Xeon Silver 4116), ~78 GiB RAM, HDD-backed root (`/dev/sdb2`, 3.6 TB).
+  No WSL2, no Windows.
+- **GPU:** Quadro RTX 5000, 16 GB, Turing, compute capability (7, 5),
+  NVIDIA driver 580.173.02 (nvidia-driver-580 from the Ubuntu archive).
+  `scripts/verify_env.py` reports the capability for information only; its
+  gate is CUDA available + GPU matmul. The GNOME desktop runs on this same
+  GPU (a display is attached), so a little VRAM is used by Xorg/gnome-shell.
+- **uv:** installed to `~/.local/bin` (`uv`, `uvx`) by the official
+  installer. `~/.profile` already prepends `~/.local/bin` to `PATH` when that
+  directory exists, and `~/.bashrc` exports it too, so no profile edit was
+  needed. Environment: `uv sync --frozen` from the repo root. If the repo is
+  ever moved, delete `.venv` and re-run `uv sync --frozen`: the venv's console
+  scripts embed absolute paths and `uv sync` does not rewrite them.
+- **Frozen eval set permissions:** see §5 — `chmod a-w
+  data/blender_scenes/transforms_test.json` after every fresh clone, then
+  `python scripts/freeze_eval_set.py --verify`.
+- **Not needed for Phase 6:** WSL2 and Blender. All renders, masks, plates and
+  poisoned datasets are restored from the ignored-files zip as literal files
+  (D-027: re-rendering is not bit-exact), never regenerated.
+- **Git:** this machine has no git identity, credential helper or SSH key
+  configured; commits here use a per-command `-c user.name/-c user.email` and
+  pushing requires credentials to be set up by the project lead.

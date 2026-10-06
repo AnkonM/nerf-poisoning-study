@@ -2142,3 +2142,42 @@ deciding whether cloud capacity is needed at all.
   had to be committed before any training could start.
 - **Reversibility:** all trivial; the only non-trivial one is item 1's venv
   rebuild, which is regenerable from `uv.lock`.
+
+## D-037 — `scripts/train.py --output-root` (additive)
+
+- **Date:** 2026-10-06
+- **Decision:** `scripts/train.py` gains an optional `--output-root PATH`. It
+  changes **only the parent directory** of the run directory; with no flag the
+  run directory is exactly the old `REPO_ROOT/experiments/runs/<run_id>`. The
+  path logic lives in a new `src/utils/run_paths.py`
+  (`resolve_run_dir`, `existing_checkpoints`) so it can be unit-tested;
+  `train.py` calls it for both the run directory and the "refuse a populated
+  run directory without `--resume`" check. No config key, no change to
+  training semantics, nothing under `src/nerf/` touched. Checkpoints and the
+  TensorBoard directory follow the run directory (they are derived from it in
+  `src/nerf/training.py`), so they follow the flag too.
+- **Why:** `train.py` hard-coded the run directory, so throughput benchmarks
+  could not be kept out of `experiments/runs/` (sweep-visible, and the
+  sweep's own resume/refuse logic reads it). Found during Phase 6 platform
+  prep; the project lead approved this option.
+- **Evidence:** 5 new tests in `tests/test_run_paths.py` (suite 51 → 56):
+  (a) default resolves identically to the old expression for three run ids,
+  (b) an override resolves under the given root, (c) checkpoint discovery
+  works under an override root (sorted, ignores non-`.tar`), (d) an end-to-end
+  subprocess run of `train.py --output-root` against a populated directory is
+  refused without `--resume`, names the overridden path, and writes nothing.
+  Smoke: a 20-iteration `control` seed-1 run with
+  `--output-root ~/scratch/phase6_bench/smoke` completed and wrote its
+  checkpoint, `tb/` and `summary.json` there; `ls -R experiments/runs`
+  checksum identical before and after.
+- **`scripts/evaluate.py`:** needs no change for out-of-tree runs. It takes an
+  explicit checkpoint path and writes `eval_<run-id>.json` beside that
+  checkpoint. (It does not write `results.csv`.)
+- **Alternatives considered:** (b) a scratch script calling
+  `train_from_config` with its own `run_dir` — rejected: it measures a
+  different code path from the one the sweep will run (no dataset
+  resolution/assertion, dirty-tree check or resume guard). A symlink inside
+  `experiments/runs/` or a `../..` run id — rejected: both hide the real
+  output path from the run's own `summary.json` and logs.
+- **Reversibility:** trivial — additive and default-preserving; removing the
+  flag restores the old behaviour exactly.

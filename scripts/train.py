@@ -28,6 +28,7 @@ import sys
 from nerf.training import train_from_config
 from utils.config import load_config
 from utils.dataset_id import resolve_dataset
+from utils.run_paths import existing_checkpoints, resolve_run_dir
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -61,6 +62,13 @@ def main() -> None:
         help="Run identifier; defaults to <condition_id>_seed<N> for condition "
         "configs, else the config file's basename. Checkpoints and tensorboard "
         "logs go to experiments/runs/<run-id>/.",
+    )
+    parser.add_argument(
+        "--output-root", default=None, metavar="PATH",
+        help="Parent directory for the run directory (default: "
+        "<repo>/experiments/runs). Changes only where <run-id>/ is created; "
+        "the --resume check, checkpoints and TensorBoard logs all follow it "
+        "(D-037). Use it to keep benchmark/smoke runs out of experiments/runs/.",
     )
     parser.add_argument(
         "--skip-final-eval", action="store_true",
@@ -125,10 +133,9 @@ def main() -> None:
             cfg["reproducibility"]["seed"] = args.seed
         run_id = args.run_id or os.path.splitext(os.path.basename(args.config))[0]
 
-    run_dir = os.path.join(REPO_ROOT, "experiments", "runs", run_id)
+    run_dir = resolve_run_dir(REPO_ROOT, run_id, args.output_root)
 
-    existing = sorted(f for f in os.listdir(run_dir) if f.endswith(".tar")) \
-        if os.path.isdir(run_dir) else []
+    existing = existing_checkpoints(run_dir)
     if existing and not args.resume:
         sys.exit(
             "Run directory already holds checkpoints: %s\n"

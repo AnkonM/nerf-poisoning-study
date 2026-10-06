@@ -45,3 +45,6 @@ experiments/runs/
 # OS/editor cruft
 .DS_Store
 .vscode/
+
+# Windows download-marker files (alternate data stream leaked by copying from Windows)
+*:Zone.Identifier

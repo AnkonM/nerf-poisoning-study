@@ -15,6 +15,7 @@ rays up front" strategy is unused by every config this project defines).
 """
 
 import os
+import random
 import time
 from typing import Any, Dict, Optional
 
@@ -31,6 +32,57 @@ from nerf.rendering import render, run_network
 from utils.seeding import set_seed
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def _capture_rng_state() -> Dict[str, Any]:
+    """Snapshot every RNG the training loop draws from (D-039).
+
+    Reading generator state consumes no random numbers, so calling this cannot
+    perturb an uninterrupted run. Everything is stored as tensors / ints /
+    floats / lists so the checkpoint still loads under torch.load's default
+    `weights_only=True` (a raw NumPy array in a checkpoint would not).
+    """
+    algo, keys, pos, has_gauss, cached = np.random.get_state()
+    state = {
+        "python": random.getstate(),
+        "numpy": {"algo": algo, "keys": torch.from_numpy(keys.astype(np.int64)),
+                  "pos": int(pos), "has_gauss": int(has_gauss), "cached": float(cached)},
+        "torch_cpu": torch.get_rng_state(),
+    }
+    if torch.cuda.is_available():
+        state["torch_cuda"] = torch.cuda.get_rng_state_all()
+    return state
+
+
+def _restore_rng_state(state: Dict[str, Any]) -> None:
+    random.setstate((state["python"][0], tuple(state["python"][1]), state["python"][2]))
+    n = state["numpy"]
+    np.random.set_state((n["algo"], n["keys"].cpu().numpy().astype(np.uint32),
+                         n["pos"], n["has_gauss"], n["cached"]))
+    torch.set_rng_state(state["torch_cpu"].cpu())
+    if "torch_cuda" in state and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all([t.cpu() for t in state["torch_cuda"]])
+
+
+def _resume_state(ckpt: Dict[str, Any], ckpt_name: str):
+    """What to restore from a loaded checkpoint: (global_step, rng_state | None, info).
+
+    D-039. A new-format checkpoint (has "rng_state") holds the state AFTER
+    iteration `ckpt["iteration"]`, so training continues at iteration+1 with
+    global_step == start - 1 (the loop invariant) and the RNGs restored. An
+    old-format one (Phase 2/3/6-probe) is loaded exactly as before: it re-runs
+    iteration global_step+1 from a freshly seeded RNG, and says so.
+    """
+    if "rng_state" in ckpt:
+        step = ckpt["iteration"]
+        return step, ckpt["rng_state"], {"from_checkpoint": ckpt_name, "from_iteration": step,
+                                         "rng_restored": True}
+    print(f"NOTE: {ckpt_name} has no RNG state (written before D-039). Resuming "
+          "with a freshly seeded RNG and the legacy behaviour of re-running "
+          "iteration `global_step + 1`; this resume is NOT bit-equivalent to an "
+          "uninterrupted run.")
+    step = ckpt["global_step"]
+    return step, None, {"from_checkpoint": ckpt_name, "from_iteration": step + 1, "rng_restored": False}
 
 
 def _build_model(cfg: Dict[str, Any]):
@@ -214,12 +266,14 @@ def train_from_config(
     optimizer = torch.optim.Adam(params=grad_vars, lr=optimizer_cfg["lr"], betas=(0.9, 0.999))
 
     global_step = 0
+    resume_info = None
+    rng_to_restore = None
     ckpts = sorted(f for f in os.listdir(run_dir) if f.endswith(".tar"))
     if ckpts:
         ckpt_path = os.path.join(run_dir, ckpts[-1])
         print(f"Reloading from checkpoint: {ckpt_path}")
         ckpt = torch.load(ckpt_path, map_location=device)
-        global_step = ckpt["global_step"]
+        global_step, rng_to_restore, resume_info = _resume_state(ckpt, ckpt_name=ckpts[-1])
         optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         model.load_state_dict(ckpt["network_fn_state_dict"])
         if model_fine is not None and ckpt.get("network_fine_state_dict") is not None:
@@ -243,6 +297,9 @@ def train_from_config(
 
     print(f"Begin training: {n_iters - 1} iterations, seed={seed}, device={device}")
     start = global_step + 1
+    if rng_to_restore is not None:
+        _restore_rng_state(rng_to_restore)  # after set_seed, model/optimizer reload, writer creation
+        print(f"Restored RNG state; continuing at iteration {start}")
     last_loss = None
     last_psnr = None
     t0 = time.time()
@@ -304,6 +361,8 @@ def train_from_config(
             torch.save(
                 {
                     "global_step": global_step,
+                    "iteration": i,
+                    "rng_state": _capture_rng_state(),
                     "network_fn_state_dict": model.state_dict(),
                     "network_fine_state_dict": model_fine.state_dict() if model_fine is not None else None,
                     "optimizer_state_dict": optimizer.state_dict(),
@@ -340,6 +399,8 @@ def train_from_config(
     torch.save(
         {
             "global_step": global_step,
+            "iteration": n_iters - 1,
+            "rng_state": _capture_rng_state(),
             "network_fn_state_dict": model.state_dict(),
             "network_fine_state_dict": model_fine.state_dict() if model_fine is not None else None,
             "optimizer_state_dict": optimizer.state_dict(),
@@ -354,6 +415,7 @@ def train_from_config(
         "n_test_views": len(i_test),
         "elapsed_hours": elapsed / 3600,
         "final_checkpoint": final_ckpt_path,
+        "resume": resume_info,
         "camera_convention": (
             "Standard NeRF-synthetic Blender convention: right-handed world "
             "coordinates, per-frame transform_matrix is a 4x4 camera-to-world "

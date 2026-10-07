@@ -2316,3 +2316,51 @@ B5 evidence it needed; it is a decision for the project lead, not made here.
 - **Reversibility:** the platform can be changed only by restarting the sweep
   from run 1 on the new hardware (single-machine rule); nothing about the
   validated settings changes with it.
+
+## D-039 — Resume restores RNG state and no longer repeats an iteration
+
+- **Date:** 2026-10-07
+- **Problem:** D-032 (finding 4) and D-038 recorded that resume reloaded the model,
+  optimizer and iteration counter but not RNG state, so after a resume the view/ray
+  sampling sequence restarted from the seed and the finished run was not reproducible
+  from config + commit. D-038 left "add RNG state to checkpoints?" open until B5 (fresh
+  same-seed runs are bit-exact) was known. It is now needed for an unattended 10-day sweep.
+- **Change (`src/nerf/training.py`, additive):** every checkpoint now also stores
+  `rng_state` (Python `random`, NumPy global, torch CPU, torch CUDA per device — the loop
+  owns no other generator; checked by grep) and `iteration`. On resume the states are
+  restored right before the loop, after `set_seed`, the model/optimizer reload and the
+  writer creation. NumPy state is stored as tensors/ints so checkpoints still load under
+  `torch.load`'s default `weights_only=True` (a raw array would have broken every load,
+  including `evaluate.py`'s). The decision of what to restore is the pure function
+  `_resume_state`. `summary.json` gains `resume` (checkpoint, iteration, `rng_restored`),
+  and `train.py`'s resume caveat now says which case applied.
+- **A second defect had to be fixed for the proof to be possible:** the old checkpoint
+  stores `global_step = i-1` and resume re-ran iteration `i`, which that checkpoint had
+  already applied (D-032 finding 3 called it harmless). With RNG restored it is not
+  harmless: resume takes one extra optimizer step and every later iteration is shifted
+  by one. New-format checkpoints therefore continue at `iteration + 1`. Old-format ones
+  are loaded exactly as before (re-run `global_step + 1`, fresh RNG) with a printed
+  `NOTE`, so Phase 2/3/probe checkpoints still load and `evaluate.py` is unaffected.
+  I did not separately measure "RNG alone without this fix"; the necessity follows from
+  the loop invariant and from the informational run C below.
+- **Proof (control, seed 1, 300 iterations, `checkpoint_every: 150`, `log_every: 10`,
+  `eval_every: 100`, scratch output; all comparisons are exact, on logged values and on
+  model + optimizer tensors, not file hashes), run on the FINAL code:**
+  - **A. Uninterrupted run unchanged (new code vs the code at `db67e69`):** 63 logged
+    points (loss, train PSNR, val PSNR) all identical, max |diff| 0.0; 193 model +
+    optimizer tensors identical at iteration 150 and at 300. **Bit-identical.**
+  - **B. Resume equivalence (150 iterations, stop, `--resume` to 300, vs uninterrupted):**
+    32 logged points after iteration 150 identical, max |diff| 0.0; 193 tensors
+    identical at 300. **Bit-identical.**
+  - **C. (informational) an OLD-format 150 checkpoint resumed by the new code:** loads with
+    the `NOTE`, but all 32 post-150 points differ (max PSNR diff 5.3 dB) and 192 of 193
+    tensors differ, i.e. the old behaviour was genuinely non-equivalent.
+  Limits: the stop in B was a clean end of a 150-iteration run, not a kill; kill -9
+  behaviour is covered by the harness fault-injection tests (D-040). Equivalence is
+  shown on this GPU/driver over 300 iterations, not over 200,000.
+- **Tests:** `tests/test_rng_resume.py` — RNG round-trip, capturing consumes no random
+  numbers, `weights_only` load, CUDA round-trip, new-format resume point, old-format load.
+- **Alternatives considered:** only flag resumed runs `resumed=true` and accept
+  non-reproducibility (the fallback if the gate had failed) — not needed.
+- **Reversibility:** additive. New checkpoints carry two extra keys; nothing reads them
+  except resume.

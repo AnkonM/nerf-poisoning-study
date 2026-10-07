@@ -83,10 +83,11 @@ def main() -> None:
         "WITHOUT this flag, a non-empty run directory is a hard error. "
         "src/nerf/training.py auto-resumes from the newest checkpoint it finds, "
         "silently — across a 24-run sweep with programmatic run ids that would "
-        "quietly continue a previous run instead of starting a new one. Note a "
-        "resumed run is NOT equivalent to an uninterrupted one: RNG state is not "
-        "checkpointed, so the training-view sequence differs after the resume "
-        "point (D-032). Record this in the run's experiments/logs/ entry.",
+        "quietly continue a previous run instead of starting a new one. Checkpoints "
+        "written since D-039 carry RNG state and resume bit-identically to an "
+        "uninterrupted run; an OLDER checkpoint has none, so its resume is NOT "
+        "equivalent (the training-view sequence differs after the resume point). "
+        "summary.json records which case applied.",
     )
     parser.add_argument(
         "--allow-dirty", action="store_true",
@@ -169,10 +170,17 @@ def main() -> None:
     summary["resumed"] = bool(existing and args.resume)
     if existing and args.resume:
         summary["resumed_from"] = existing[-1]
-        summary["resume_caveat"] = (
-            "RNG state is not checkpointed, so the training-view sequence after "
-            "the resume point differs from an uninterrupted run (D-032)."
-        )
+        if (summary.get("resume") or {}).get("rng_restored"):
+            summary["resume_caveat"] = (
+                "RNG state restored from the checkpoint (D-039): resume is "
+                "bit-equivalent to an uninterrupted run (verified, see D-039)."
+            )
+        else:
+            summary["resume_caveat"] = (
+                "Checkpoint has no RNG state (pre-D-039), so the training-view "
+                "sequence after the resume point differs from an uninterrupted "
+                "run (D-032)."
+            )
     if dataset_info:
         summary.update({"condition_id": cfg["condition_id"], **dataset_info})
 

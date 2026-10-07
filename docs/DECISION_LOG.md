@@ -2364,3 +2364,131 @@ B5 evidence it needed; it is a decision for the project lead, not made here.
   non-reproducibility (the fallback if the gate had failed) — not needed.
 - **Reversibility:** additive. New checkpoints carry two extra keys; nothing reads them
   except resume.
+
+## D-040 — Phase 6 sweep harness
+
+- **Date:** 2026-10-07
+- **Scope:** Step 2 of Phase 6: the harness that will run the 24-run sweep, built and
+  tested in a sandbox. **The real sweep has not been started**; nothing was written to the
+  real `experiments/runs/`, `experiments/logs/` or `results.csv`. Nothing here touches
+  `METHODOLOGY.md` §1–§7, D-032–D-035's locked values, `src/poisoning`, data or frozen files.
+  The one change to shared training code is D-039 (resume).
+- **Code:** `scripts/run_sweep.py` (thin CLI: `run`, `status`, `queue`, `stop [--now]`,
+  `clear-stopped`, `run --dry-run`) over `src/utils/sweep_{queue,state,checks,runner,record,status}.py`.
+  `run_sweep.sh` from `PROJECT_STRUCTURE.md` was **dropped**: a shell loop cannot do disk-derived
+  state, preflight or the stop policy, and keeping a second entry point would invite using it.
+  `--root` redirects runs/logs/results/lock; the default is the real paths.
+
+### Queue
+24 runs, **seed-major**: seed 1 (control, C1…C7), then seed 2, then seed 3. Why: an incomplete
+sweep still has every condition at the lower N (the ROADMAP "What to Cut" fallback, N=3 → N=2)
+rather than some conditions at N=3 and others at none, and a condition-specific bug shows up in
+the first 8 runs instead of at run 16+. `run_id` is `train.py`'s `<condition_id>_seed<N>`.
+The (condition, seed) → dataset rule is the single `dataset_id_for` (D-032): C1–C6 →
+`<condition>_seed<s>`; `control` and `C7` are seed-invariant, so all three training seeds share
+`data/poisoned/control/` and `data/poisoned/C7/`. It is cross-checked against `MANIFEST.csv`
+(condition + `selection_seed`), not only computed. The eight condition configs are listed
+explicitly: `probe_control_convergence.yaml` inherits `budget_00.yaml` and so ALSO declares
+`condition_id: control`, which auto-discovery would have counted as two controls.
+**Overlap reported, not resolved:** `ROADMAP.md` Phase 7 lists C7 (strategic selection) as its
+own phase, while Phase 6 says "all 8 conditions × N seeds" = 24 runs, which includes C7. The
+queue follows Phase 6 as stated. If C7 belongs to Phase 7, it is the last run of each seed
+block and can be excluded with `--only`; the project lead decides.
+
+### State is derived from disk
+COMPLETE iff final checkpoint **and** `summary.json` **and** an `eval_<run_id>.json` scoring that
+final checkpoint **and** a `results.csv` row all exist; FAILED iff `FAILED.json`; PARTIAL iff
+checkpoints exist (or training finished) but not COMPLETE, with the next action (train / eval /
+record) derived too; PENDING otherwise. `summary.json` is required on top of the final checkpoint
+because the periodic checkpoint at iteration 200,000 shares the final checkpoint's filename and can
+exist ~1 min of in-training validation before the real final save. Restarting after a crash,
+reboot or `kill -9` therefore needs no database and is idempotent.
+
+### Safety
+- **One instance:** `flock` on `runs/.sweep.lock` (released by the OS when the holder dies, tested
+  with `kill -9`); a second instance exits 11 and says why. The training child is started with
+  `PR_SET_PDEATHSIG=SIGKILL`, so a `kill -9` of the harness cannot leave an orphan training
+  process (tested: none left, GPU idle).
+- **Preflight before every run and every retry, fail closed:** clean working tree (recording the
+  commit); `freeze_eval_set.py --verify` passes (the writable-file warning is surfaced); dataset
+  directory has 100 training images and the manifest's poisoned count equals
+  `round(b/100 × 100)`; ≥ 20 GB free; no compute process on the GPU and GPU memory ≤ 2,048 MiB
+  (D-038's 588 MiB desktop baseline + ~1.4 GiB margin; polls up to 30 s for a just-killed
+  context); and a **hardware pin** written on the first run and compared on every later one
+  (GPU name + UUID, driver, torch build) so D-038's single-machine rule is enforced rather than
+  assumed — a mismatch fails the run. Any preflight failure stops the queue (STOPPED marker, exit
+  10) without marking the run FAILED, since it is not the run's fault.
+- **The "clean tree" rule and the output contract conflict, and this is how it is resolved:**
+  the harness writes `experiments/logs/*.md`/`*.png` and `results.csv` into the repo (they are not
+  git-ignored), which would make the tree dirty after run 1 and stop the queue at run 2. The
+  tree check therefore ignores exactly those two directories; **any other** change fails it. All
+  other bookkeeping (lock, hardware pin, STOPPED, STOP_AFTER_CURRENT) lives under the
+  git-ignored `experiments/runs/`. `train.py`'s own dirty-tree guard cannot know about harness
+  outputs, so the harness passes `--allow-dirty` to it; the replacement guards are the
+  preflight before every run and a post-run check that `HEAD` has not moved and the tree has not
+  become dirty (either fails the run).
+- **Execution:** `scripts/train.py --skip-final-eval --output-root runs/ --seed S --run-id ID`, then,
+  only after it exits, `scripts/evaluate.py` as a **separate process**; never overlapping. Evidence
+  (D-038): single-process peak is 3.4 GiB while training but **8.4 GiB reserved at the in-training
+  validation**, and two concurrent processes reached 15,457 of 16,384 MiB (0.9 GB headroom) with
+  no throughput gain (−5%). Completion is decided by real exit codes plus the on-disk artifacts.
+- **Failure policy:** crash / CUDA error / OOM / SIGKILL → retry with `--resume`, at most 2 retries,
+  each recorded with the iteration. **Non-finite loss, or windowed divergence → the child is
+  killed, the run is marked FAILED, it is not retried, and the queue STOPS** (a non-converged run is
+  a bug, not a data point). Post-run validation (checkpoint, `summary.json` identity/dataset/poisoned
+  count, finite eval, eval scored the final checkpoint, HEAD unchanged) failing also fails the run and
+  stops the queue. A truncated newest checkpoint (kill during `torch.save`; seen for real in the
+  fault-injection test) is quarantined as `*.tar.corrupt` and the previous one is resumed. A
+  run killed before its first checkpoint restarts clean, keeping the old TensorBoard dir as
+  `tb.aborted-*`. After STOPPED, the harness refuses to start until `clear-stopped`, and a FAILED run
+  stays FAILED until its directory is moved aside.
+- **Divergence detector:** compares the **median** of the older half with the median of the newer
+  half of the last 40 log points (20 + 20 = 20,000 iterations at `log_every: 500`) and flags only
+  if newer > 2.0 × older; a non-finite loss is flagged at once. Medians, not means or extrema, so a
+  lone noisy batch cannot trigger it (the Phase 3 lesson). **Validation:** 20 noisy synthetic decaying
+  runs and a spike case do not flag; NaN/inf, a rising curve and too few points behave correctly;
+  and replaying what the harness would have seen at every poll over the real logged curves —
+  the 200k probe (361 polls), the 200k Phase 2 Lego run (361) and the three Phase 3 PoC runs (63) —
+  gave **zero flags**, with a maximum healthy ratio of **1.42** (probe) against the 2.0 limit. The
+  margin is therefore ~1.4×, not large; the thresholds are defaults chosen before the sweep and are
+  not tuned on sweep data.
+
+### Per-run record and `results.csv` contract
+`experiments/logs/<run_id>.md` (the template's fields, auto-filled; unmeasured fields say so),
+`<run_id>_loss.png` (from TensorBoard), `harness_events.jsonl` in the run directory (start,
+resume, retry, quarantine, interrupted, failed, with iterations), and one `results.csv` row written
+**after** the log entry and idempotently (a re-run never duplicates; a header mismatch refuses to
+append). The row carries config path, commit, dataset id + train-set digest, verified poisoned
+count, checkpoint/eval paths, resume/retry counts, hardware and the log-entry path.
+**Metrics gap, reported exactly:** `scripts/evaluate.py` does **not** write `results.csv`, and it
+computes only **one number — mean whole-frame PSNR over the 75 frozen eval views** (plus view count
+and minutes), written to `eval_<run_id>.json`. None of METHODOLOGY §6's primary metrics (masked and
+unmasked PSNR/SSIM/LPIPS) nor the plate-distance secondary metric exist anywhere in the code yet.
+The harness copies evaluate.py's number into the row (column named for what it is) and marks the
+other seven metric fields "not computed"; **no metric was invented**. To keep Phase 8 possible,
+**every checkpoint is retained** (every 25,000 iterations plus the final one, ~115 MB per run,
+~2.8 GB total) and nothing is ever deleted — this supersedes the D-032 retention note about
+deleting intermediate checkpoints. Computing the §6 metrics from these against the frozen eval set
+is Phase 8 work and is not done here.
+
+### Testing (all in a sandbox; real paths untouched)
+68 unit tests with a mocked subprocess (queue order/size/mapping, state from a synthetic tree, lock
+incl. `kill -9` of a holder, preflight failure modes, detector, retry/exhaustion/NaN/divergence/
+interrupt/quarantine/idempotence/validation) → suite 130 passed. End-to-end on 2 conditions × 1 seed with
+120-iteration configs (checkpoint every 20, eval on 3 views via `dataset.testskip`, in-training
+validation off): COMPLETE, log entries, loss PNGs, 2 results rows. **Fault injection:** `kill -9` of the
+training subprocess (retried with `--resume`), then `kill -9` of the harness mid-run (no orphan, GPU
+idle), then restart: both runs finished with final model + optimizer tensors, all 12 logged loss
+points and eval PSNR **bit-identical** to an uninterrupted sandbox run, correct resume/retry events,
+one results row each. Also verified: a second instance is refused (exit 11) while one training
+process runs; a dirty tree is refused; a real injected NaN (lr 1e8 in a scratch config) is caught at
+iteration 10, the run is FAILED with no retry, the queue stops and a restart is refused. Not tested:
+a run longer than ~1 minute, a real disk-full, a driver change, a power loss.
+
+### What was NOT built
+Automatic §6 metrics; any sweep-wide aggregation or plots; deletion/pruning of checkpoints;
+off-machine backup or notification (git push is also not configured, so D-032–D-040 exist only on
+this disk); the human inspection of each loss curve that the Phase 6 gate requires (each log entry
+says PENDING); a watchdog for a hung-but-alive training process (a hang would show as no log progress
+in `status`, but is not killed automatically); power or temperature alerts.
+- **Reversibility:** all additive; `run_sweep.py` is not imported by anything else.

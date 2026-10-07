@@ -1,0 +1,36 @@
+# systemd --user unit for the Phase 6 sweep harness (D-040). INSTALLED BUT NOT ENABLED OR STARTED.
+# Install / start / stop instructions: environment/SETUP.md §7.
+#
+# Exit codes of `scripts/run_sweep.py run` and what systemd does with them:
+#   0   queue complete or graceful stop         -> not restarted (success)
+#   10  STOPPED by policy (failed/diverged run, failed preflight/validation) -> NOT restarted:
+#       a human must investigate; restarting would just stop again
+#   11  another instance holds the lock         -> NOT restarted
+#   1 / killed by a signal (harness crash)      -> restarted after 120 s; run state is derived from
+#       disk so the restart resumes correctly. 5 failures within an hour stop the restarts
+#       (StartLimit) instead of crash-looping.
+[Unit]
+Description=NeRF poisoning study - Phase 6 sweep harness (one training process at a time)
+Documentation=file://%h/nerf-poisoning/nerf-poisoning-study/environment/SETUP.md
+StartLimitIntervalSec=3600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/nerf-poisoning/nerf-poisoning-study
+ExecStart=%h/nerf-poisoning/nerf-poisoning-study/.venv/bin/python -u scripts/run_sweep.py run
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=120
+RestartPreventExitStatus=10 11
+# `systemctl --user stop` sends SIGTERM to the harness, which stops its training child and exits 0;
+# KillMode=control-group guarantees nothing is left running on the GPU either way.
+KillMode=control-group
+TimeoutStopSec=120
+# stdout/stderr go to the journal (journalctl --user -u nerf-sweep -f); the harness ALSO appends every line to
+# experiments/logs/sweep_harness.log, and each run keeps its own train.log under experiments/runs/<run_id>/.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

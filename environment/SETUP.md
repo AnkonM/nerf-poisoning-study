@@ -273,3 +273,73 @@ describes the machine that runs Phase 6.
 - **Git:** this machine has no git identity, credential helper or SSH key
   configured; commits here use a per-command `-c user.name/-c user.email` and
   pushing requires credentials to be set up by the project lead.
+
+## 7. Running the Phase 6 sweep (harness, service, tmux fallback)
+
+The harness is `scripts/run_sweep.py` (logic in `src/utils/sweep_*.py`, D-040). It runs
+the 24 runs seed-major, **one training process at a time**, and derives all state from
+disk, so it is safe to stop, kill or reboot at any point and simply start it again.
+Output goes to `experiments/runs/<run_id>/` (checkpoints, `train.log`, events),
+`experiments/logs/<run_id>.md` + `<run_id>_loss.png`, and `experiments/results/results.csv`.
+
+**Nothing below has been run for the real sweep. The service unit is installed but NOT
+enabled and NOT started.**
+
+### Machine facts checked on 2026-10-06
+- `loginctl show-user`: **Linger=yes** — user services survive logout and start at boot,
+  so no sudo is needed for the service route.
+- `tmux` is installed (`/usr/bin/tmux`).
+- GPU persistence mode on, CPU governor `performance`, NVIDIA driver/kernel packages
+  held (D-038). The harness's preflight does not re-check these, but its hardware pin
+  fails the sweep closed if the GPU, driver or torch build ever changes.
+
+### Option A (recommended): systemd user service
+```bash
+# one-time install (already done; the unit is disabled and inactive)
+mkdir -p ~/.config/systemd/user
+cp environment/nerf-sweep.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+
+# start the real sweep now (does not survive a reboot unless also enabled)
+systemctl --user start nerf-sweep.service
+# start now AND on every boot
+systemctl --user enable --now nerf-sweep.service
+
+systemctl --user status nerf-sweep.service      # is it up
+python scripts/run_sweep.py status              # the 24-run table, ETAs, GPU, disk, STOPPED marker
+journalctl --user -u nerf-sweep -f              # live harness log (also in experiments/logs/sweep_harness.log)
+tail -f experiments/runs/<run_id>/train.log     # the current run's training log
+```
+Restart policy: exit 0 (done / graceful stop) and exit codes 10 (STOPPED by policy) and 11
+(lock held) are **not** restarted; a harness crash (exit 1 / signal) is restarted after
+120 s, and 5 failures in an hour stop the restarts. After that: `systemctl --user
+reset-failed nerf-sweep.service`.
+
+### Option B: tmux (no systemd)
+```bash
+tmux new -s sweep -d 'cd ~/nerf-poisoning/nerf-poisoning-study && .venv/bin/python -u scripts/run_sweep.py run 2>&1 | tee -a experiments/logs/sweep_tmux.log'
+tmux attach -t sweep          # look; detach with Ctrl-b d
+tmux kill-session -t sweep    # hard stop (see "stopping")
+```
+Without tmux or systemd, `setsid nohup .venv/bin/python -u scripts/run_sweep.py run >> experiments/logs/sweep_nohup.log 2>&1 &`
+survives a closed shell or SSH disconnect (not a reboot). Launch it from your own terminal,
+not from inside a Claude Code session.
+
+### Stopping, and what it costs
+- **Graceful (recommended):** `python scripts/run_sweep.py stop` — the harness finishes the
+  *current* run (training, evaluation, log entry, results row), then exits before the next
+  one. Costs nothing, but can take up to ~10 h.
+- **Now:** `python scripts/run_sweep.py stop --now`, `systemctl --user stop nerf-sweep`, or
+  killing tmux/the process. The training child is stopped immediately; the run stays PARTIAL
+  and **resumes from its latest checkpoint** next start. Checkpoints are written every
+  25,000 iterations, so this redoes **up to 25,000 iterations ≈ 71 min** (at the measured
+  5.83 it/s). Resume restores RNG state, so the finished run is bit-identical to an
+  uninterrupted one (D-039); every resume is recorded in the run's log entry anyway.
+- **After a STOPPED marker** (`experiments/runs/STOPPED`, also shown by `status`): the queue
+  halted on purpose — a diverged/NaN run, a failed preflight or validation. Investigate the
+  reason, then `python scripts/run_sweep.py clear-stopped`. A FAILED run additionally stays
+  FAILED until its run directory is moved aside (it is never silently retried or skipped).
+- **Before starting for real:** `python scripts/run_sweep.py run --dry-run` prints the queue
+  state and runs the preflight read-only. The working tree must be clean (the harness's own
+  outputs under `experiments/logs/` and `experiments/results/` are exempt), so commit
+  or stash anything else first.

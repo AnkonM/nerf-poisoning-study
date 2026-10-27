@@ -1,0 +1,7 @@
+{
+  "checkpoint": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/experiments/runs/C7_seed3/200000.tar",
+  "config_path": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/configs/poisoning/ablation_random_vs_strategic.yaml",
+  "test_psnr": 43.06102648417155,
+  "n_test_views": 75,
+  "elapsed_minutes": 13.983912607034048
+}

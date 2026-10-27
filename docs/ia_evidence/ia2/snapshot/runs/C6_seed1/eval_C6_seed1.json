@@ -1,0 +1,7 @@
+{
+  "checkpoint": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/experiments/runs/C6_seed1/200000.tar",
+  "config_path": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/configs/poisoning/soft_suppression_20.yaml",
+  "test_psnr": 42.28201667785645,
+  "n_test_views": 75,
+  "elapsed_minutes": 14.107377537091573
+}

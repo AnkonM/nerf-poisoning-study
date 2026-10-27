@@ -1,0 +1,46 @@
+PHASE 6 SWEEP - FINAL SUMMARY (IA-2): 24 of 24 runs complete
+Generated 2026-10-28 from the finished sweep. Analysis was read-only on the repo; no GPU use.
+
+CODE THE SWEEP RAN ON
+- Commit 76fbebaac1171a6821356ab93dcb29ec381388f1 (2026-10-07) "D-040: Phase 6 sweep harness ...".
+  All 24 results.csv rows record this git_commit. Runs were launched with --allow-dirty (working tree had only untracked
+  files: new experiments/logs/*.md and *_loss.png; no modified tracked files).
+
+INVENTORY (8 conditions x 3 seeds) - inventory.tsv / inventory.json
+- All 24 complete at 200000 iterations, all present in results.csv, 0 retry events.
+- control_seed3 was interrupted once (2026-10-14) and resumed from iteration 150000 on 2026-10-23 (resume_events=1).
+- Sweep order: seed-major, queue ended "queue complete" 2026-10-26T14:37 (experiments/logs/sweep_harness.log, copied in snapshot/).
+
+METRIC SOURCE (every number)
+- Whole-frame test PSNR: experiments/results/results.csv (snapshot/results.csv), column test_psnr_mean_whole_frame_db,
+  75 frozen eval-holdout views, computed by scripts/evaluate.py at run time (not recomputed here).
+- Loss statistics: per-run train.log (logged every 500 iters; single-batch loss). Training-batch PSNR in logs is not used.
+- NOT available: masked/target-region suppression metric, collateral metric, val-split PSNR (TensorBoard not parsed).
+  suppression_vs_budget.png and collateral_vs_budget.png were therefore not produced.
+
+RESULTS (whole-frame test PSNR, dB, mean ± sample std, n=3)
+ control 0%            50.23 ± 0.19
+ C1  5% hard random    46.71 ± 0.50
+ C2 10% hard random    42.53 ± 0.69
+ C3 20% hard random    39.85 ± 0.81
+ C4 30% hard random    37.89 ± 0.72
+ C5 50% hard random    34.34 ± 0.18
+ C6 20% soft supp.     43.31 ± 0.91
+ C7 20% hard strategic 43.55 ± 0.42
+- Means fall monotonically with budget; per-step drops are uneven (5->10%: -4.2 dB, 20->30%: -2.0 dB).
+- C3 vs C6/C7 differ by ~3.5-3.7 dB; C6 vs C7 differ by 0.24 dB (within noise). Seed ranges are 0.35-1.71 dB; differences under ~1 dB are unresolved.
+- Whole-frame PSNR mixes target and non-target error; it cannot separate suppression from collateral damage.
+
+ANOMALIES / CAVEATS
+- final_train_loss in results.csv is a single batch (noisy); compare conditions with trailing means in inventory.tsv.
+- No NaN/divergence/OOM strings in any train.log. Single-batch spikes up to ~3e-2 occur but every run ends near 1e-4.
+- Convergence: first-half mean loss is much higher than second-half (early transient), so it says little about a plateau.
+  Quarter 3 vs quarter 4 (quarters.txt): loss was still falling in every run (Q4/Q3 < 1), so runs had not plateaued at 200k iterations.
+- D-023 near/far: no near/far data was examined; no statement made.
+- VRAM: no OOM in logs; training used ~9.1 GiB of 16 GiB.
+
+FILES (this directory)
+ SUMMARY.txt, partial_results.md (full results table; name kept from the interim version), loss_curves.png,
+ whole_frame_psnr_vs_budget.png, inventory.tsv, inventory.json, quarters.txt, analyze.py,
+ snapshot/ (results.csv, sweep_harness.log, run entry .md files, per-run train.log / summary.json / eval json / harness_events.jsonl).
+ No checkpoints, datasets or renders are included.

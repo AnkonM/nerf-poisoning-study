@@ -1,0 +1,4 @@
+{"t": 1792755235.6597905, "utc": "2026-10-23T11:33:55Z", "event": "start", "attempt": 0, "commit": "76fbebaac1171a6821356ab93dcb29ec381388f1", "checkpoint": null, "from_iteration": 0, "env": {"hostname": "hpc-sdb-Precision-7820-Tower", "gpu": "Quadro RTX 5000", "driver": "580.173.02", "persistence_mode": "Disabled", "cpu_governor": "powersave", "torch": "2.14.0+cu130", "cuda_build": "cu130"}}
+{"t": 1792790039.9098191, "utc": "2026-10-23T21:13:59Z", "event": "attempt_end", "attempt": 0, "returncode": 0, "wall_s": 34804.1511361599, "last_logged_iteration": 200000}
+{"t": 1792790040.3860817, "utc": "2026-10-23T21:14:00Z", "event": "eval_start", "attempt": 0}
+{"t": 1792790895.4653566, "utc": "2026-10-23T21:28:15Z", "event": "eval_end", "attempt": 0, "returncode": 0}

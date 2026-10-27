@@ -1,0 +1,25 @@
+run	status	iter	final_train_loss(single batch, summary.json)	mean_last20_logged_loss	first_half_mean_loss	second_half_mean_loss	log
+control_seed1	complete	200000	1.120e-04	1.220e-04	4.577e-04	1.340e-04	experiments/runs/control_seed1/train.log
+control_seed2	complete	200000	7.415e-05	1.165e-04	3.555e-04	1.336e-04	experiments/runs/control_seed2/train.log
+control_seed3	complete	200000	4.818e-05	1.180e-04	3.463e-04	1.356e-04	experiments/runs/control_seed3/train.log
+C1_seed1	complete	200000	1.362e-04	1.335e-04	5.012e-04	1.528e-04	experiments/runs/C1_seed1/train.log
+C1_seed2	complete	200000	7.656e-05	1.235e-04	4.126e-04	1.500e-04	experiments/runs/C1_seed2/train.log
+C1_seed3	complete	200000	6.335e-05	1.325e-04	4.118e-04	1.467e-04	experiments/runs/C1_seed3/train.log
+C2_seed1	complete	200000	1.361e-04	1.585e-04	5.801e-04	1.683e-04	experiments/runs/C2_seed1/train.log
+C2_seed2	complete	200000	9.315e-05	1.400e-04	4.708e-04	1.679e-04	experiments/runs/C2_seed2/train.log
+C2_seed3	complete	200000	6.947e-05	1.405e-04	4.868e-04	1.602e-04	experiments/runs/C2_seed3/train.log
+C3_seed1	complete	200000	2.107e-04	1.675e-04	6.316e-04	1.817e-04	experiments/runs/C3_seed1/train.log
+C3_seed2	complete	200000	1.082e-04	1.470e-04	5.233e-04	1.836e-04	experiments/runs/C3_seed2/train.log
+C3_seed3	complete	200000	6.367e-05	1.650e-04	5.580e-04	1.893e-04	experiments/runs/C3_seed3/train.log
+C4_seed1	complete	200000	1.369e-04	1.515e-04	6.832e-04	1.807e-04	experiments/runs/C4_seed1/train.log
+C4_seed2	complete	200000	9.645e-05	1.615e-04	5.990e-04	1.871e-04	experiments/runs/C4_seed2/train.log
+C4_seed3	complete	200000	5.695e-05	1.640e-04	5.303e-04	1.805e-04	experiments/runs/C4_seed3/train.log
+C5_seed1	complete	200000	2.583e-04	1.830e-04	7.022e-04	1.950e-04	experiments/runs/C5_seed1/train.log
+C5_seed2	complete	200000	1.157e-04	1.575e-04	5.546e-04	1.864e-04	experiments/runs/C5_seed2/train.log
+C5_seed3	complete	200000	7.518e-05	1.710e-04	5.562e-04	1.905e-04	experiments/runs/C5_seed3/train.log
+C6_seed1	complete	200000	1.510e-04	1.375e-04	5.474e-04	1.576e-04	experiments/runs/C6_seed1/train.log
+C6_seed2	complete	200000	7.979e-05	1.315e-04	4.288e-04	1.544e-04	experiments/runs/C6_seed2/train.log
+C6_seed3	complete	200000	7.238e-05	1.470e-04	4.402e-04	1.628e-04	experiments/runs/C6_seed3/train.log
+C7_seed1	complete	200000	1.344e-04	1.240e-04	4.878e-04	1.390e-04	experiments/runs/C7_seed1/train.log
+C7_seed2	complete	200000	8.340e-05	1.145e-04	4.103e-04	1.391e-04	experiments/runs/C7_seed2/train.log
+C7_seed3	complete	200000	5.822e-05	1.280e-04	3.976e-04	1.383e-04	experiments/runs/C7_seed3/train.log

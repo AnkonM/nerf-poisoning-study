@@ -1,0 +1,7 @@
+{
+  "checkpoint": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/experiments/runs/C3_seed1/200000.tar",
+  "config_path": "/home/hpc-sdb/nerf-poisoning/nerf-poisoning-study/configs/poisoning/budget_20.yaml",
+  "test_psnr": 39.099233576456704,
+  "n_test_views": 75,
+  "elapsed_minutes": 14.063828043142955
+}

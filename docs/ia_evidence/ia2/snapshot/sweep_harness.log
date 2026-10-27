@@ -1,0 +1,77 @@
+2026-10-07T16:00:48 [control_seed1] state PENDING, next action train
+2026-10-07T16:00:49   [control_seed1] start (attempt 0) from iteration 0
+2026-10-08T01:56:22 [control_seed1] COMPLETE (test PSNR 50.078 dB over 75 views)
+2026-10-08T01:56:22 [C1_seed1] state PENDING, next action train
+2026-10-08T01:56:23   [C1_seed1] start (attempt 0) from iteration 0
+2026-10-08T11:53:11 [C1_seed1] COMPLETE (test PSNR 46.791 dB over 75 views)
+2026-10-08T11:53:11 [C2_seed1] state PENDING, next action train
+2026-10-08T11:53:11   [C2_seed1] start (attempt 0) from iteration 0
+2026-10-08T21:48:59 [C2_seed1] COMPLETE (test PSNR 41.918 dB over 75 views)
+2026-10-08T21:48:59 [C3_seed1] state PENDING, next action train
+2026-10-08T21:49:00   [C3_seed1] start (attempt 0) from iteration 0
+2026-10-09T07:44:17 [C3_seed1] COMPLETE (test PSNR 39.099 dB over 75 views)
+2026-10-09T07:44:17 [C4_seed1] state PENDING, next action train
+2026-10-09T07:44:18   [C4_seed1] start (attempt 0) from iteration 0
+2026-10-09T17:39:51 [C4_seed1] COMPLETE (test PSNR 37.251 dB over 75 views)
+2026-10-09T17:39:51 [C5_seed1] state PENDING, next action train
+2026-10-09T17:39:52   [C5_seed1] start (attempt 0) from iteration 0
+2026-10-10T03:34:54 [C5_seed1] COMPLETE (test PSNR 34.364 dB over 75 views)
+2026-10-10T03:34:54 [C6_seed1] state PENDING, next action train
+2026-10-10T03:34:55   [C6_seed1] start (attempt 0) from iteration 0
+2026-10-10T13:29:58 [C6_seed1] COMPLETE (test PSNR 42.282 dB over 75 views)
+2026-10-10T13:29:58 [C7_seed1] state PENDING, next action train
+2026-10-10T13:29:58   [C7_seed1] start (attempt 0) from iteration 0
+2026-10-10T23:25:01 [C7_seed1] COMPLETE (test PSNR 43.761 dB over 75 views)
+2026-10-10T23:25:01 [control_seed2] state PENDING, next action train
+2026-10-10T23:25:01   [control_seed2] start (attempt 0) from iteration 0
+2026-10-11T09:20:04 [control_seed2] COMPLETE (test PSNR 50.452 dB over 75 views)
+2026-10-11T09:20:04 [C1_seed2] state PENDING, next action train
+2026-10-11T09:20:04   [C1_seed2] start (attempt 0) from iteration 0
+2026-10-11T19:15:22 [C1_seed2] COMPLETE (test PSNR 47.166 dB over 75 views)
+2026-10-11T19:15:22 [C2_seed2] state PENDING, next action train
+2026-10-11T19:15:23   [C2_seed2] start (attempt 0) from iteration 0
+2026-10-12T05:10:40 [C2_seed2] COMPLETE (test PSNR 42.387 dB over 75 views)
+2026-10-12T05:10:40 [C3_seed2] state PENDING, next action train
+2026-10-12T05:10:41   [C3_seed2] start (attempt 0) from iteration 0
+2026-10-12T15:05:59 [C3_seed2] COMPLETE (test PSNR 40.707 dB over 75 views)
+2026-10-12T15:05:59 [C4_seed2] state PENDING, next action train
+2026-10-12T15:05:59   [C4_seed2] start (attempt 0) from iteration 0
+2026-10-13T01:01:32 [C4_seed2] COMPLETE (test PSNR 37.745 dB over 75 views)
+2026-10-13T01:01:32 [C5_seed2] state PENDING, next action train
+2026-10-13T01:01:33   [C5_seed2] start (attempt 0) from iteration 0
+2026-10-13T10:56:20 [C5_seed2] COMPLETE (test PSNR 34.496 dB over 75 views)
+2026-10-13T10:56:20 [C6_seed2] state PENDING, next action train
+2026-10-13T10:56:21   [C6_seed2] start (attempt 0) from iteration 0
+2026-10-13T20:51:08 [C6_seed2] COMPLETE (test PSNR 43.996 dB over 75 views)
+2026-10-13T20:51:09 [C7_seed2] state PENDING, next action train
+2026-10-13T20:51:09   [C7_seed2] start (attempt 0) from iteration 0
+2026-10-14T06:45:57 [C7_seed2] COMPLETE (test PSNR 43.828 dB over 75 views)
+2026-10-14T06:45:57 [control_seed3] state PENDING, next action train
+2026-10-14T06:45:57   [control_seed3] start (attempt 0) from iteration 0
+2026-10-14T14:32:42 interrupted: the child was stopped; control_seed3 will resume from its latest checkpoint
+2026-10-23T13:31:32 graceful stop requested: stopping before control_seed1
+2026-10-23T14:23:03 [control_seed3] state PARTIAL, next action train
+2026-10-23T14:23:04   [control_seed3] resume (attempt 0) from iteration 150000
+2026-10-23T17:03:55 [control_seed3] COMPLETE (test PSNR 50.171 dB over 75 views)
+2026-10-23T17:03:55 [C1_seed3] state PENDING, next action train
+2026-10-23T17:03:55   [C1_seed3] start (attempt 0) from iteration 0
+2026-10-24T02:58:15 [C1_seed3] COMPLETE (test PSNR 46.168 dB over 75 views)
+2026-10-24T02:58:15 [C2_seed3] state PENDING, next action train
+2026-10-24T02:58:16   [C2_seed3] start (attempt 0) from iteration 0
+2026-10-24T12:54:21 [C2_seed3] COMPLETE (test PSNR 43.284 dB over 75 views)
+2026-10-24T12:54:21 [C3_seed3] state PENDING, next action train
+2026-10-24T12:54:22   [C3_seed3] start (attempt 0) from iteration 0
+2026-10-24T22:51:27 [C3_seed3] COMPLETE (test PSNR 39.758 dB over 75 views)
+2026-10-24T22:51:27 [C4_seed3] state PENDING, next action train
+2026-10-24T22:51:28   [C4_seed3] start (attempt 0) from iteration 0
+2026-10-25T08:47:19 [C4_seed3] COMPLETE (test PSNR 38.676 dB over 75 views)
+2026-10-25T08:47:19 [C5_seed3] state PENDING, next action train
+2026-10-25T08:47:19   [C5_seed3] start (attempt 0) from iteration 0
+2026-10-25T18:44:10 [C5_seed3] COMPLETE (test PSNR 34.149 dB over 75 views)
+2026-10-25T18:44:10 [C6_seed3] state PENDING, next action train
+2026-10-25T18:44:10   [C6_seed3] start (attempt 0) from iteration 0
+2026-10-26T04:41:46 [C6_seed3] COMPLETE (test PSNR 43.649 dB over 75 views)
+2026-10-26T04:41:46 [C7_seed3] state PENDING, next action train
+2026-10-26T04:41:46   [C7_seed3] start (attempt 0) from iteration 0
+2026-10-26T14:37:07 [C7_seed3] COMPLETE (test PSNR 43.061 dB over 75 views)
+2026-10-26T14:37:07 queue complete

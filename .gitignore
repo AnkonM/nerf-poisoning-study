@@ -48,3 +48,6 @@ experiments/runs/
 
 # Windows download-marker files (alternate data stream leaked by copying from Windows)
 *:Zone.Identifier
+
+# D-041: eval-view renders are derived artifacts (float16 arrays + PNGs); never commit them
+experiments/renders/

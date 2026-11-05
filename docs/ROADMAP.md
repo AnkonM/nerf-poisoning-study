@@ -19,7 +19,7 @@ that's the whole point of having gates.
 | 5 — Poisoning pipeline build | Complete | PASS — manifest counts exact for all 20 datasets (0/5/10/20/30/50 = `round(b/100 × 100)`); outside-mask strict byte identity across 425 poisoned images, 0 deviations; 1,575/1,575 unpoisoned views byte-identical; 29 pytest tests pass; D-020 closed with byte-identical regeneration proven. See `DECISION_LOG.md` D-028–D-031. |
 | 6 — Minimum poisoning-budget sweep | **Sweep complete** — 24/24 runs COMPLETE (single GPU model, Quadro RTX 5000), eval-view renders produced and validated; loss-curve sign-off and Phase 8 metrics pending (D-041) | The 24-run sweep finished on the native Ubuntu 24.04 HPC machine (D-038, D-040): 0 FAILED/STOPPED, one resume (`control_seed3`). The 75 frozen eval views were rendered from every run's final checkpoint (`experiments/renders/`, git-ignored) and validated against the harness eval JSON (max 0.0062 dB, D-041). **Not done:** the §6 metrics (Phase 8, to be built and run on the laptop), human loss-curve inspection (log entries still PENDING), Colab/Kaggle parity (unverified, unexercised). See `DECISION_LOG.md` D-032-D-041. |
 | 7 — Ablation (random vs strategic) | Not started | — |
-| 8 — Evaluation & analysis | Not started | — |
+| 8 — Evaluation & analysis | **In progress** — §6 metrics built and computed for all 24 runs (D-042); plots and analysis pending | Metric definitions pre-registered in `DECISION_LOG.md` D-042 and committed before any 24-run computation; outputs in `experiments/results/metrics/` (per-view, per-run, reference GT-vs-plate). Not done: core plots, C3-vs-C7 comparison, qualitative figures, write-up of results. |
 | 9 — Optional strengthening (conditional) | Not started | — |
 | 10 — Write-up | Not started | — |
 

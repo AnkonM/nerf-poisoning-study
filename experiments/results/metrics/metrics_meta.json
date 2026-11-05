@@ -1,0 +1,29 @@
+{
+  "definition_version": "D-042-v1",
+  "eval_manifest_sha256": "3e7d4ba96e1d32f1081f5f78887c61989207493efcc4652fe3d27d56253f63c6",
+  "eval_set_aggregate_sha256": "211a5a59d85cf29447a7608e74bbe49ebe08717709d3c520bc3af549d65ab214",
+  "lpips_net": "alex",
+  "lpips_version": "0.1.4",
+  "lpips_weights_paths": {
+    "backbone": "/home/ankon/.cache/torch/hub/checkpoints/alexnet-owt-7be5be79.pth",
+    "linear": "/home/ankon/projects/nerf-poisoning-study/.venv/lib/python3.12/site-packages/lpips/weights/v0.1/alex.pth"
+  },
+  "lpips_weights_sha256": {
+    "backbone": "7be5be791159472b1fbf3c69796f7cb30dca7ad8466c2df70058c37116cdee02",
+    "linear": "df73285e35b22355a2df87cdb6b70b343713b667eddbda73e1977e0c860835c0"
+  },
+  "mask_dilation_px": 3,
+  "metrics_code_commit": "284d141fe8e1c97f0d18c975a681e87a97ee4439",
+  "metrics_code_dirty_paths": [],
+  "min_visible_area_fraction": 0.005,
+  "n_views_included": 75,
+  "skimage_version": "0.26.0",
+  "ssim_params": {
+    "channel_axis": -1,
+    "data_range": 1.0,
+    "gaussian_weights": true,
+    "sigma": 1.5,
+    "use_sample_covariance": false,
+    "win_size": 11
+  }
+}

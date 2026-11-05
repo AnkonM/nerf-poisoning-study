@@ -2620,3 +2620,58 @@ in `status`, but is not killed automatically); power or temperature alerts.
   eval JSON 50.0784 dB (deviation -0.0057 dB; tolerance 0.02); 75 views; target + collateral = 160,000 px every view; no
   NaN/inf; render-vs-plate PSNR 12.138 dB next to GT-vs-plate 12.122 dB over the same views (reported, not judged).
 - **Reversibility.** Additive; any definition error is fixed through a NEW entry (D-043...) followed by recomputation.
+
+
+## D-043 — Phase 8 analysis plan (pre-registration)
+
+- **Date:** 2026-11-05
+- **Scope:** fixes, BEFORE any aggregate, plot or diagnostic is produced from the D-042 metrics, how the 24 runs are
+  aggregated, which pairs are compared, which exploratory diagnostics are run, and how qualitative figures are chosen.
+  It clarifies the analysis only; it changes nothing in METHODOLOGY §1-§7, D-032..D-035 or D-042. Input of record:
+  `experiments/results/metrics/per_run.csv`, sha256 `ba10c20623a59e9b97ef6da494d6b94146ed818101dbaf8d0f740aa8a242ac40`
+  (24 rows, one per condition x seed; its checkpoint and render_meta hashes were re-checked against
+  `phase6_final_checkpoints.csv` and the `render_meta.json` files). Every figure and table records this hash.
+- **A. Aggregation.** Per condition, mean and SAMPLE standard deviation (ddof = 1) over the 3 seeds, for every primary
+  metric column in per_run.csv (whole, target `tgt_`, collateral `col_`, M_raw target `rawtgt_` x PSNR/SSIM/LPIPS, and
+  `plate_mse`, `plate_psnr`), plus n, min, max and the per-seed values. Per-seed points are shown in every plot and
+  every table. With N = 3 there are no p-values and no significance language; instead each comparison reports whether the
+  per-seed ranges [min, max] overlap (overlap iff max_a >= min_b and max_b >= min_a). `control` and `C7` train on ONE
+  dataset (seed-invariant selection, D-032), so their seed spread is initialisation-only variance; the spread of C1-C6
+  includes view-selection variance AND initialisation variance. The two kinds of spread are labelled as such wherever
+  they appear and are never presented as like for like.
+- **B. Comparison pairs (fixed).** Budget curve: control (budget 0) and C1..C5 (hard erasure, random selection).
+  Hard vs soft: **C3 vs C6** (both 20%, random; soft alpha 0.4 per `configs/poisoning/soft_suppression_20.yaml`); NOT C4.
+  Random vs strategic: **C3 vs C7** (both 20%, hard erasure).
+- **C. Exploratory diagnostics.** These were motivated by seeing the primary table in the Phase 8 metrics report, so
+  they are labelled "exploratory, post-hoc-motivated" everywhere they appear and never become a headline claim without
+  their own decision entry.
+  - **E1.** Per-view distribution of target-region PSNR and plate PSNR per condition, pooled over 75 views x 3 seeds,
+    from the existing per-view CSVs only (strip/violin with median and IQR beside the mean; CSV with n, mean, median,
+    Q1, Q3, min, max).
+  - **E2.** For C3 vs C7: per-view target PSNR against eval-view azimuth and elevation, and against the angular distance
+    to the nearest POISONED training view. Camera positions are the translation column of each `transform_matrix`
+    (`transforms_test.json`, `transforms_train.json`), taken relative to the scene origin (0,0,0), as specified;
+    azimuth = atan2(y, x), elevation = asin(z/|p|), angular distance = arccos of the dot product of unit position
+    vectors. Poisoned training views per seed come from `data/poisoned/MANIFEST.csv` (`poisoned == True` for the
+    condition's dataset_id; C7's single dataset id is `C7`).
+  - **E3.** Collateral-error localisation: the collateral region (complement of M_dil, from
+    `metrics.eval_data.load_eval_data`, not reimplemented) is split at 400x400 by a Euclidean distance transform to
+    M_dil (`cv2.distanceTransform`, DIST_L2, mask 5) into bands 0 < d <= 10, 10 < d <= 30, 30 < d <= 100 and d > 100 px.
+    Per run and band: mean over eval views of the per-view mean squared error render-vs-clean-GT over the band's pixels
+    (views whose band is empty are skipped and counted). A diagnostic, not a new metric.
+  - **E4.** Table of each run's final training loss (`summary.json`) beside its final validation PSNR and its collateral
+    PSNR (24 runs), no inference drawn. NOTE: `summary.json` carries no validation PSNR; the final validation value is the
+    last point of the `val/psnr_subset` TensorBoard scalar in the run's `tb/` directory (same value as the last
+    "val-subset PSNR" line in `train.log`). That source is used and stated. The validation views are clean (never poisoned).
+  - **E5.** The one resumed run: `control_seed3` against control seeds 1 and 2 on every primary metric; report each value
+    and whether it falls inside the [min, max] of seeds 1-2.
+- **D. Qualitative figure rule (deterministic, no hand-picking by appearance).** Eval views at the 10th, 50th and 90th
+  percentile of RAW target mask area (800x800, `area_fraction_800` in per_view CSVs): views sorted by (area, view_index),
+  index = round(q * 74) for q = 0.1, 0.5, 0.9 (i.e. 7, 37, 67). Seed 1 for every condition, stated on the figure. Rows:
+  clean GT, background plate, control, C1..C7; target-region close-ups (M_dil bounding box + 20 px, clipped) in a second
+  panel. A separate shadow-retention figure shows, for the poisoned training view with the median raw mask area among
+  C5 seed 1's poisoned views (sorted by (area, index), element (n-1)//2), the original vs the poisoned image vs the
+  plate, captioned as expected per D-022 Finding 4 and METHODOLOGY §3 "Scope of the edit".
+- **Language rule.** No causal language in outputs; hypotheses are labelled as hypotheses; surprising results are
+  reported, not explained away. Figures carry a sidecar JSON (per_run.csv sha256, run_ids, columns, git commit).
+- **Reversibility.** Additive; analysis code and outputs are derived from existing metrics and can be regenerated.

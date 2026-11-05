@@ -209,3 +209,7 @@ See `DECISION_LOG.md` D-022 Finding 4 and D-024.
 **Clarification 2026-11-05 (not a deviation):** the pixel-level procedure for the §6 metrics (regions, resolution,
 view inclusion, SSIM/LPIPS pooling) is specified in `DECISION_LOG.md` D-042, recorded before the metrics were
 computed. §1-§7 are unchanged.
+
+**Clarification 2026-11-05 (not a deviation):** the Phase 8 analysis plan (aggregation, comparison pairs, exploratory
+diagnostics, qualitative-figure rule) is pre-registered in `DECISION_LOG.md` D-043, before any aggregate was computed.
+§1-§7 are unchanged.

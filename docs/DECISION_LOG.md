@@ -2492,3 +2492,63 @@ this disk); the human inspection of each loss curve that the Phase 6 gate requir
 says PENDING); a watchdog for a hung-but-alive training process (a hang would show as no log progress
 in `status`, but is not killed automatically); power or temperature alerts.
 - **Reversibility:** all additive; `run_sweep.py` is not imported by anything else.
+
+
+## D-041 — Phase 6 closeout: eval-view renders and transfer
+
+- **Date:** 2026-11-05 (renders produced 2026-11-02, 16:24-22:08 IST)
+- **Scope:** after the Phase 6 sweep completed (24/24 COMPLETE, 0 FAILED/STOPPED/PARTIAL, `results.csv` 24 rows,
+  one per condition x seed), the 75 frozen eval views were rendered from every run's FINAL (200,000-iteration)
+  checkpoint and everything was packaged for manual transfer to the laptop. Nothing here touches
+  `METHODOLOGY.md` §1-§7, D-032-D-035's locked values, `src/nerf`, checkpoints, run dirs or `results.csv` rows.
+  Nothing was trained; no sweep command was run.
+- **What was rendered and why:** the rendering is the GPU-heavy step (~14.3 min per run, ~5.8 h total), so it was
+  done on the idle HPC machine. The §6 metrics were NOT computed here: `evaluate.py` computes only whole-frame PSNR
+  (D-040 "Metrics gap"), and the masked/unmasked PSNR/SSIM/LPIPS and plate-distance code is built and run on the
+  laptop (Phase 8) from the stored renders.
+- **How:** `scripts/render_eval_views.py` + `src/utils/render_eval.py` reuse `evaluate.py`'s path: same config and
+  dataset resolution, `load_blender_data`, white compositing, `_build_model`/`_render_kwargs` (perturb 0, no noise),
+  and `nerf.rendering.render` with the same chunk (fp32, no AMP/fp16/TF32). Only per-view PSNR bookkeeping is local,
+  because `evaluate_psnr` returns one mean and discards the images. One child process per run (VRAM freed between
+  runs; peak reserved 5.97 GiB in the last run's metadata), sequential, `freeze_eval_set.py --verify` run before
+  starting. Output (git-ignored `experiments/renders/<run_id>/`): `eval_000..074.png` (8-bit),
+  `renders_fp16.npz` (float16 [75,400,400,3] + `view_index`), `render_meta.json`. Written to `<run_id>.partial`,
+  renamed only after validation passes; restart skips runs with a valid `render_meta.json`.
+- **Validation (gate, per run): PASS for all 24.** Mean PSNR recomputed from `renders_fp16.npz` against the frozen
+  ground truth (loaded independently of the render path) vs the harness eval JSON: **max deviation 0.0062 dB**
+  across the 24 runs (limit 0.01 dB; the margin is ~1.6x at ~50 dB because float16 quantisation scales with the
+  white background, so it was a real risk). The same mean computed from the fp32 render at render time matches the
+  harness JSON to **0.0000 dB in all 24** (aggregation is mean of per-view PSNR, exactly as `evaluate_psnr`). All
+  runs: 75 views, 400x400, no NaN/inf, 75 PNGs, checkpoint SHA-256 equal to
+  `experiments/results/phase6_final_checkpoints.csv`. All 24 renders carry eval-manifest SHA-256
+  `3e7d4ba96e1d32f1081f5f78887c61989207493efcc4652fe3d27d56253f63c6` and eval-set aggregate
+  `211a5a59d85cf29447a7608e74bbe49ebe08717709d3c520bc3af549d65ab214`.
+- **Whole-frame PSNR from evaluate.py, NOT the §6 metrics** (mean +/- sample std over 3 seeds; per-run values in
+  `experiments/results/phase6_sweep_summary.md`): control 50.234 +/- 0.195; C1 46.709 +/- 0.504; C2 42.530 +/- 0.694;
+  C3 39.855 +/- 0.808; C4 37.891 +/- 0.724; C5 34.336 +/- 0.175; C6 43.309 +/- 0.906; C7 43.550 +/- 0.425. Per D-034
+  these are not comparable with published NeRF numbers. Control seed 1 (50.078 dB) is 0.70 dB below the D-033/D-034
+  reference (50.778 dB); no run is more than 3 dB outside its condition's other seeds. These are flags, not
+  judgements.
+- **Facts for the write-up:** (1) **all 24 runs came from one GPU model (Quadro RTX 5000, Turing), driver 580.173.02,
+  torch 2.14.0+cu130**, so no cross-GPU variation is measured. (2) `control_seed3` was interrupted at ~160,500
+  iterations and resumed from the 150,000 checkpoint (one resume event, D-039 RNG-restoring resume; the machine's
+  persistence mode/CPU governor differed during the resume). Its summary.json says `resumed: true` and its recorded
+  train wall time (2.43 h) covers only the resumed segment.
+- **Bit-exactness limits (B5/D-038, D-027):** B5 showed bit-exact same-seed reruns only over 300 iterations on this
+  machine, not over 200,000 iterations, the periodic validation, or other GPUs/drivers; the D-039 resume equivalence
+  was verified only in short sandbox runs, so `control_seed3` is not shown bit-equivalent to an uninterrupted run.
+  Renders themselves are deterministic here only in the sense verified above (fp32 re-render PSNR equals the harness
+  PSNR to 0.0000 dB); the frozen eval set can never be re-rendered (D-027). fp16 storage adds <= 0.0062 dB on
+  whole-frame PSNR, and the fp32 per-run PSNR is kept in `render_meta.json`.
+- **NOT done:** the §6 metrics (masked/unmasked PSNR, SSIM, LPIPS, background-plate distance); the human loss-curve
+  inspection (every log entry still says PENDING; a contact sheet was produced to help); Colab/Kaggle environment
+  parity remains **unverified and unexercised**; no off-machine backup beyond the transfer bundle.
+- **Other observation:** the enabled `nerf-sweep.service` auto-started on 2026-11-02 16:15 and 2026-11-05 11:56 (on
+  login/boot), printed "queue complete" and exited; it appended a line to `experiments/logs/sweep_harness.log` and
+  rewrote `experiments/runs/.sweep.lock` (PID file). Harmless now, but it should be disabled by the project lead
+  before any change to the queue or tree. It was not touched here; `.sweep.lock` is excluded from the transfer manifest
+  for that reason.
+- **Packaging:** `~/transfer/` (not in the repo): `phase6_runs_1.zip` (3.18 GB), `phase6_renders_1.zip` (1.85 GB),
+  `phase6_bundle.zip`, `TRANSFER_MANIFEST.sha256`, `README_TRANSFER.md`; each zip < 3.5 GB (FAT32).
+- **Reversibility:** additive; renders and zips are derived and regenerable from the checkpoints (the renders from the
+  checkpoints and the frozen eval set, which is never re-rendered).

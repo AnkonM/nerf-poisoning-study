@@ -2552,3 +2552,71 @@ in `status`, but is not killed automatically); power or temperature alerts.
   `phase6_bundle.zip`, `TRANSFER_MANIFEST.sha256`, `README_TRANSFER.md`; each zip < 3.5 GB (FAT32).
 - **Reversibility:** additive; renders and zips are derived and regenerable from the checkpoints (the renders from the
   checkpoints and the frozen eval set, which is never re-rendered).
+
+
+## D-042 — Phase 8 §6 metric definitions (pre-registration)
+
+- **Date:** 2026-11-05
+- **Scope:** fixes, BEFORE any 24-run metric computation, exactly how METHODOLOGY §6's metrics are computed from the
+  stored eval-view renders. It **clarifies** §6 (which names the metrics and the target/collateral regions but not the
+  pixel-level procedure); it does **not** change §1-§7 or anything locked in D-032..D-035. Code, tests, this entry and
+  the §10 line are committed together, ahead of every run except the single control-seed-1 sanity gate below.
+- **Definitions (approved by the project lead; implemented exactly in `src/metrics/`, `scripts/compute_metrics.py`):**
+  - **A. Images.** Clean ground-truth eval images (the frozen originals, NOT poisoned), composited on white and
+    downscaled 800->400 through the same function and interpolation (cv2.INTER_AREA) as the training/eval loader
+    (`load_blender_data(half_res=True)` is called itself; the white composite is evaluate.py's). Background plates are
+    handled exactly like the GT images. Renders: `renders_fp16.npz` cast to float32, order checked against view indices
+    0..74. All values in [0,1], data_range = 1.0.
+  - **B. Regions (per view).** M_dil: raw eval mask, read with `read_mask` (asserted uint16 {0,65535} on all 75), dilated
+    3 px using the poisoning pipeline's operation (square (2d+1)x(2d+1) element of ones, `cv2.dilate`) at 800x800, then
+    cv2.INTER_AREA to 400x400 and threshold > 0.5; never nearest-neighbour. M_raw: raw mask, same downscale and
+    threshold (sensitivity variant only). Target region = M_dil. Collateral region = complement of M_dil. They partition
+    the 400x400 frame exactly (asserted).
+  - **C. View inclusion.** The §2 minimum-visibility threshold (`v_target.min_visible_area_fraction` = 0.005 in
+    `configs/scenes/final_scene.yaml`; the unit is a FRACTION of frame pixels, i.e. 3,200 of 640,000) applied to the RAW
+    mask at its native 800x800 resolution. Target-region metrics (target, M_raw target, plate distance) average over
+    included views; collateral and whole-frame metrics use all 75. Measured on the sanity-gate run: 75/75 views qualify
+    (target area 2,878-3,985 px at 400x400 after dilation).
+  - **D. PSNR.** Per view, MSE pooled over the region's pixels and channels, PSNR = -10 log10(MSE), data_range 1.
+    Aggregate = mean over views. An MSE of 0 is recorded as `inf` in the per-view file and counted in
+    `n_inf_psnr_views`; aggregates containing it are `inf`, never silently averaged away.
+  - **E. SSIM.** skimage `structural_similarity`, full=True, gaussian_weights=True, sigma=1.5, win_size=11,
+    use_sample_covariance=False, data_range=1.0, channel_axis. Region value = mean of the SSIM map (channel-averaged) over
+    region pixels. The window straddles the mask boundary (known property). The whole-frame value is the mean of the map
+    over ALL pixels (including the 5 px border), which can differ slightly from skimage's cropped `mssim`.
+  - **F. LPIPS.** `lpips` package (0.1.4), net='alex', spatial=True, inputs scaled to [-1,1]. Region value = mean of the
+    spatial distance map over region pixels. Limitation: the receptive field extends beyond the mask, so region-pooled
+    SSIM/LPIPS partly reflect surrounding context; PSNR is the region-pure metric. Backbone weights: torchvision
+    `alexnet-owt-7be5be79.pth`, one-time download from download.pytorch.org on 2026-11-05, sha256
+    `7be5be791159472b1fbf3c69796f7cb30dca7ad8466c2df70058c37116cdee02` (pinned in code); linear-layer weights ship with
+    the package (`alex.pth`, sha256 `df73285e35b22355a2df87cdb6b70b343713b667eddbda73e1977e0c860835c0`). The metric code
+    never downloads (the lpips backbone is built with `pnet_rand=True` and the pinned local file is loaded) and fails
+    loudly if the file is missing or its hash differs. Batch size <= 4 under `torch.no_grad()`; on CUDA OOM it drops to
+    batch size 1 and says so (recorded in per_run.csv); there is no CPU fallback.
+  - **G. Plate distance.** MSE and PSNR of the RENDER against the BACKGROUND PLATE over M_dil. The same quantity for the
+    clean GT against the plate is written once per eval view to `experiments/results/metrics/reference_gt_vs_plate.csv`
+    as the scale for reading plate distance, not as a new metric.
+  - **H. Per-run outputs.** Whole-frame PSNR/SSIM/LPIPS; target (M_dil) PSNR/SSIM/LPIPS vs clean GT; collateral PSNR/SSIM/
+    LPIPS vs clean GT; M_raw target PSNR/SSIM/LPIPS (labelled sensitivity, column prefix `rawtgt_`); plate PSNR and MSE;
+    included-view count. Aggregates are means over views; per-condition mean +/- std over seeds belongs to the Phase 8
+    analysis step. Files: `experiments/results/metrics/per_view/<run_id>.csv`, `per_run.csv` (recomputing replaces the
+    row), `metrics_meta.json`, `reference_gt_vs_plate.csv`.
+- **Reasoning.** (1) One mask partitions the frame, so the collateral region contains no pixel the attack may have
+  edited; with the poisoning dilation (3 px, D-024) the target region covers everything the compositor could change, and
+  the cast shadow outside it is counted as collateral by construction (D-022 Finding 4). (2) INTER_AREA, not nearest,
+  because thin structures such as the mug handle alias under nearest-neighbour downscaling, and it is the interpolation
+  the loader applies to the images. (3) `alex` is the lpips package's default and the one its authors recommend for use
+  as a metric.
+- **Known limitations.** Region-pooled SSIM/LPIPS include surrounding context (see E, F); the dilation function is a
+  copy of an expression that `scripts/build_poison_set.py` inlines (it has no importable function), pinned to it by
+  `tests/test_metrics.py::test_dilation_matches_poisoning_expression`; the plate is a render of the scene without the
+  target, so shadow/bounce effects outside the mask make the plate differ from the clean GT outside the mask (not
+  scored); fp16 render storage adds <= 0.0062 dB to whole-frame PSNR (D-041).
+- **Render provenance (not a blocker).** The 24 render sets were produced at commit `6be1b89` with four then-untracked
+  closeout files (`phase6_final_checkpoints.csv`, `package_transfer.py`, `transfer_pack.py`,
+  `test_transfer_pack.py`), as recorded in each `render_meta.json`; each render's checkpoint sha256 matches
+  `phase6_final_checkpoints.csv` and each render's eval-set hashes match the frozen set.
+- **Sanity gate (control seed 1 only, before this commit).** Whole-frame PSNR from the new code 50.0727 dB vs
+  eval JSON 50.0784 dB (deviation -0.0057 dB; tolerance 0.02); 75 views; target + collateral = 160,000 px every view; no
+  NaN/inf; render-vs-plate PSNR 12.138 dB next to GT-vs-plate 12.122 dB over the same views (reported, not judged).
+- **Reversibility.** Additive; any definition error is fixed through a NEW entry (D-043...) followed by recomputation.

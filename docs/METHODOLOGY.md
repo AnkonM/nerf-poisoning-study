@@ -205,3 +205,7 @@ colour-bleed retention under mask-limited erasure) is **not** a deviation. It
 was added before the freeze, during Phase 4 Step 2, to state explicitly a
 property the §3 formulas always had; the formulas themselves are unchanged.
 See `DECISION_LOG.md` D-022 Finding 4 and D-024.
+
+**Clarification 2026-11-05 (not a deviation):** the pixel-level procedure for the §6 metrics (regions, resolution,
+view inclusion, SSIM/LPIPS pooling) is specified in `DECISION_LOG.md` D-042, recorded before the metrics were
+computed. §1-§7 are unchanged.

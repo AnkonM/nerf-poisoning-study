@@ -1,0 +1,32 @@
+{
+  "columns": [
+    "renders_fp16.npz"
+  ],
+  "decision": "D-043",
+  "eval_views": [
+    15,
+    34,
+    37
+  ],
+  "figure": "fig6b_qualitative_closeups",
+  "files": [
+    "fig6b_qualitative_closeups.png",
+    "fig6b_qualitative_closeups.pdf"
+  ],
+  "git_commit": "d987c9a03e4af40e448c02f796fcf238f36e53f7",
+  "git_dirty_paths": [],
+  "per_run_csv": "experiments/results/metrics/per_run.csv",
+  "per_run_sha256": "ba10c20623a59e9b97ef6da494d6b94146ed818101dbaf8d0f740aa8a242ac40",
+  "run_ids": [
+    "C1_seed1",
+    "C2_seed1",
+    "C3_seed1",
+    "C4_seed1",
+    "C5_seed1",
+    "C6_seed1",
+    "C7_seed1",
+    "control_seed1"
+  ],
+  "seed": 1,
+  "selection_rule": "sorted by (raw target area, view index); index round(q*74) for q=0.1,0.5,0.9"
+}

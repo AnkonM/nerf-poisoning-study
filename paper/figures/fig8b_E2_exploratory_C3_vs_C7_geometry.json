@@ -1,0 +1,24 @@
+{
+  "columns": [
+    "tgt_psnr"
+  ],
+  "decision": "D-043",
+  "figure": "fig8b_E2_exploratory_C3_vs_C7_geometry",
+  "files": [
+    "fig8b_E2_exploratory_C3_vs_C7_geometry.png",
+    "fig8b_E2_exploratory_C3_vs_C7_geometry.pdf"
+  ],
+  "git_commit": "d987c9a03e4af40e448c02f796fcf238f36e53f7",
+  "git_dirty_paths": [],
+  "per_run_csv": "experiments/results/metrics/per_run.csv",
+  "per_run_sha256": "ba10c20623a59e9b97ef6da494d6b94146ed818101dbaf8d0f740aa8a242ac40",
+  "run_ids": [
+    "C3_seed1",
+    "C3_seed2",
+    "C3_seed3",
+    "C7_seed1",
+    "C7_seed2",
+    "C7_seed3"
+  ],
+  "source": "per_view CSVs + transforms + MANIFEST.csv"
+}

@@ -8,7 +8,7 @@
     "fig7_shadow_retention.png",
     "fig7_shadow_retention.pdf"
   ],
-  "git_commit": "d987c9a03e4af40e448c02f796fcf238f36e53f7",
+  "git_commit": "002f642a9b7802b80d838c098ed950595bb4a45c",
   "git_dirty_paths": [],
   "n_poisoned_views_C5_seed1": 50,
   "per_run_csv": "experiments/results/metrics/per_run.csv",

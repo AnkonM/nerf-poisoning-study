@@ -175,6 +175,11 @@ def main():
     ylims = {}
     for col in pcols:
         v = [x for c in ("C3", "C6", "C7") for x in A.values(rows, c, col)]
+        # layout only: include the mean +/- sample-std error bars so they are not clipped by the axes
+        for c in ("C3", "C6", "C7"):
+            vc = A.values(rows, c, col)
+            m, s = float(np.mean(vc)), float(np.std(vc, ddof=1))
+            v += [m - s, m + s]
         pad = 0.08 * (max(v) - min(v))
         ylims[col] = (min(v) - pad, max(v) + pad)
     for name, (ca, cb), fn in (("hard_vs_soft", A.PAIRS["hard_vs_soft"], "fig4_C3_vs_C6"),

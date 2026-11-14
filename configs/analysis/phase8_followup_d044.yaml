@@ -1,0 +1,44 @@
+# Phase 8 follow-up diagnostics (DECISION_LOG.md D-044). Descriptive / exploratory only.
+# Every parameter of scripts/followup_diagnostics.py and scripts/depth_opacity_diagnostics.py lives here.
+
+inputs:
+  per_run_csv: experiments/results/metrics/per_run.csv
+  per_view_dir: experiments/results/metrics/per_view
+  reference_csv: experiments/results/metrics/reference_gt_vs_plate.csv
+  manifest_csv: data/poisoned/MANIFEST.csv
+  eval_transforms: data/blender_scenes/transforms_test.json
+  train_transforms: data/blender_scenes/transforms_train.json   # clean-scene camera rig; same source as E2 (D-043)
+
+outputs:
+  tables_dir: experiments/results/phase8/followup
+  figures_dir: paper/figures
+
+conditions: [control, C1, C2, C3, C4, C5, C6, C7]
+seeds: [1, 2, 3]
+metrics: [tgt_psnr, tgt_ssim, tgt_lpips, col_psnr, col_ssim, col_lpips, plate_psnr, plate_mse]   # D-043 pair metrics
+
+paired:            # 2a: difference = b minus a, paired by seed
+  a: C3
+  b: C6
+
+mse_aggregate:     # 2c
+  regions: [tgt, col, plate]
+  per_view_psnr_tolerance_db: 1.0e-9
+
+farther_than_reference:   # 2d
+  conditions: [control, C3, C5, C6, C7]
+
+spread:            # 2e
+  reference_condition: control
+
+depth_opacity:     # Part 3 (exploratory; GPU only, no CPU fallback)
+  seed: 1
+  conditions: [control, C3, C5, C7]
+  reference_condition: control
+  chunk_size: 2048
+  min_chunk_size: 256
+  out_root: experiments/renders_diagnostics
+  render_meta_template: experiments/renders/{run_id}/render_meta.json
+  stored_renders_template: experiments/renders/{run_id}/renders_fp16.npz
+  angle_bins_deg: [10, 20]        # E2 thresholds, chosen post hoc in D-043; kept for comparability only
+  config_dir: configs/poisoning    # summary.json holds the HPC absolute config path; its basename is resolved here

@@ -2853,3 +2853,53 @@ The D-044 Part 3 depth/opacity diagnostics are not used by this rule.
 ### I. Reversibility and bug handling
 Additive. If a defect in this rule is found after the evidence is computed, it is fixed only by a new entry that says why
 and reports the old and the new outcome; this entry is not edited.
+
+## D-046 — Phase 9 experiment selected: B100
+
+- **Date:** 2026-11-14
+- **Rule fixed before the evidence.** The decision rule is D-045 (commit `2629643`), committed before
+  `scripts/phase9_decision_evidence.py` was run. Applied exactly as written; no threshold was changed. Evidence:
+  `experiments/results/phase9/decision_evidence.{csv,md}`, `gates.csv`, `speed_test.json`; parameters in
+  `configs/analysis/phase9_decision_evidence.yaml`. Aggregates: pre-registered mean-of-PSNR and view-mean pooled-MSE PSNR
+  (`metrics.followup.run_region_aggregates`).
+- **Gates.**
+
+  | gate | result | numbers |
+  |---|---|---|
+  | G1 (C8 coverage below C3 and C7) | PASS | E2 mean E1, C8 seeds 1-3: 10.93 / 11.06 / 10.61 deg; min C3 12.98; C7 21.99 |
+  | G2 (E3 > 0 in all four settings) | **FAIL** | 18 runs: +0.771 (mean-of-PSNR), **-0.140** (pooled-MSE); 15 runs: +0.633, +0.677 |
+  | G3 (E4 R >= 1.5, both aggregates) | **FAIL** | R = 1.389 (mean-of-PSNR), 0.932 (pooled-MSE) |
+  | G4 (C8 + calibration fit 60 h) | PASS | 59.00 h for 4 runs |
+  | C8 qualifies | **FAIL** | G2 and G3 fail |
+  | B100 E5 ratios >= 1.0 | PASS | target 5.51 / 3.58, plate 7.81 / 3.36 (mean-of-PSNR / pooled-MSE) |
+  | B100 fits cap | PASS | 59.00 h for 4 runs (calibration + seeds 1-3) |
+  | B100 qualifies | PASS | |
+  | both fit the cap together | FAIL | 103.25 h for 7 runs |
+
+- **E1 means (deg), per seed 1/2/3:** C1 25.03/26.63/23.33; C2 16.85/15.12/16.75; C3 12.98/13.50/14.20; C4 10.73/11.34/11.25;
+  C5 9.04/9.57/8.92; C7 21.99 (one dataset). **E4 inputs:** target mean C7 29.50 vs C3 25.90 (sd 2.60) under mean-of-PSNR;
+  19.10 vs 21.14 (sd 2.19) under pooled-MSE. **E5 inputs:** target PSNR mean C4 -> C5 22.56 -> 18.08 (mean-of-PSNR),
+  18.91 -> 15.33 (pooled-MSE); plate 14.41 -> 16.62, 12.93 -> 14.35.
+- **E6 (laptop speed test).** 5.36 it/s steady (four 500-iteration windows after the start-up window; 5.19-5.65); validation of 5
+  views = 464 s per event, 19 events per run; final eval extrapolated at 92.9 s/view x 75 views = 1.94 h. Hours per run =
+  10.37 (training) + 2.45 (validation) + 1.94 (final eval) = 14.75. Calibration + 3 runs = 59.00 h of the 60 h cap
+  (margin 1.0 h, about 1.7 %). C3 seeds 2-3 for calibration would add 29.5 h and do NOT fit the cap.
+- **Selection:** B100 (C8 does not qualify; B100 does). By the rule, C8 is not run and is not a follow-up.
+- **E7 facts (no threshold).** No real-photo directory in the repo (`data/real`, `data/raw_photos`, `data/photos`,
+  `data/llff` absent); no inpainting code in `src/` or `scripts/`; `tinycudann` and `nerfstudio` are not importable in the
+  project environment; `cv2` is; `nvcc` is absent.
+- **Predictions fixed in D-045 F for B100, reported whichever way they come out:** P1 mean plate PSNR exceeds the maximum of
+  C5's three per-seed values; P2 target PSNR is below C5's minimum per-seed value; both under both aggregates.
+- **Caveats recorded with the decision (facts, not reasons to change it).**
+  - The cost margin is 1.0 h. The speed test is 2,500 iterations (about 6 minutes of training); the GPU reported
+    `SW Thermal Slowdown` active at 85-86 C during it, and sustained 10-hour behaviour is unmeasured.
+  - The validation step reserved 8.27 GiB (torch) against 7.96 GiB of physical VRAM (8151 MiB), nvidia-smi peak 7711 MiB; the
+    harness must be checked against this (validation takes 93 s per view).
+  - E3 differs in sign between the two aggregates on the 18-run set (+0.771 vs -0.140); E3 is correlational and was not used
+    beyond the pre-registered gate.
+  - The validation-event count in the evidence config was corrected from 20 to 19 before the first run (the loop fires at
+    i = 10000..190000); D-045 fixed no count.
+  - The E7 code grep first matched the evidence script itself; it now excludes that file (result 0 hits either way except
+    that self-match).
+  - Calibration comparisons with Phase 6 cross GPU architectures (Turing -> Blackwell).
+- **Reversibility.** Additive; nothing locked is touched.

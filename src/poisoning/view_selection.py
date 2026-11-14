@@ -73,3 +73,47 @@ def sample_strategic(v_target: Sequence[int], budget_percent: float,
     num_poisoned = num_poisoned_for_budget(budget_percent, len(v_target))
     ranked = sorted(v_target, key=lambda v: (-areas[v], v))
     return sorted(int(v) for v in ranked[:num_poisoned]), num_poisoned
+
+
+def _unit_directions(positions) -> np.ndarray:
+    p = np.asarray(positions, dtype=np.float64)
+    return p / np.linalg.norm(p, axis=1, keepdims=True)
+
+
+def sample_farthest_point(positions, v_target: Sequence[int], budget_percent: float, seed: int,
+                          tie_tol_rad: float = 1e-12):
+    """Coverage-controlled selection (C8, DECISION_LOG.md D-045): farthest-point sampling over the
+    camera directions of the training views.
+
+    `positions[i]` is the camera position of training view i (the pose's translation column); a view's
+    direction is the unit vector from the scene origin to that position and the metric is the angle between
+    directions (arccos of the clipped dot product). The candidates are the views in `v_target`.
+
+    * The FIRST view is a seeded draw: `numpy.random.default_rng(seed).integers(len(candidates))`, an index
+      into the candidates sorted ascending.
+    * Every next view maximises the minimum angular distance to the already-selected set.
+    * Ties (within `tie_tol_rad` of the maximum) resolve to the lowest view index.
+    * `num_poisoned_for_budget(budget_percent, len(v_target))` views are selected.
+
+    Deterministic given (positions, v_target, budget, seed). Returns (sorted list of selected view
+    indices, num_poisoned), like the other selection functions.
+    """
+    cand = sorted(int(v) for v in v_target)
+    n = num_poisoned_for_budget(budget_percent, len(cand))
+    if n > len(cand):
+        raise ValueError("budget selects more views than there are candidates")
+    if n == 0:
+        return [], 0
+    d = _unit_directions(np.asarray(positions, dtype=np.float64)[cand])
+    ang = np.arccos(np.clip(d @ d.T, -1.0, 1.0))                 # [len(cand), len(cand)] radians
+    first = int(np.random.default_rng(seed).integers(len(cand)))
+    chosen = [first]
+    mind = ang[first].copy()                                      # min distance to the selected set
+    mind[first] = -1.0                                            # selected views are never re-picked
+    while len(chosen) < n:
+        best = mind.max()
+        nxt = int(np.flatnonzero(mind >= best - tie_tol_rad)[0])  # candidates are sorted: lowest index first
+        chosen.append(nxt)
+        mind = np.minimum(mind, ang[nxt])
+        mind[chosen] = -1.0
+    return sorted(cand[i] for i in chosen), n

@@ -1,0 +1,20 @@
+# Phase 9 task, Part 5: depth noise floor (exploratory addendum to D-044; descriptive only). GPU only, no CPU fallback.
+# Same render path as D-044 Part 3 (scripts/depth_opacity_diagnostics.py); every parameter lives here.
+
+inputs:
+  manifest_csv: data/poisoned/MANIFEST.csv
+
+outputs:
+  tables_dir: experiments/results/phase8/followup
+
+depth_noise_floor:
+  conditions: [control, C3, C5, C7]
+  seeds: [1, 2, 3]
+  chunk_size: 2048
+  min_chunk_size: 256
+  out_root: experiments/renders_diagnostics       # git-ignored; float16 arrays
+  existing_seed1_template: experiments/renders_diagnostics/{run_id}/depth_acc_fp16.npz
+  render_meta_template: experiments/renders/{run_id}/render_meta.json
+  stored_renders_template: experiments/renders/{run_id}/renders_fp16.npz
+  config_dir: configs/poisoning
+  d044_part3_summary: experiments/results/phase8/followup/part3_summary.csv

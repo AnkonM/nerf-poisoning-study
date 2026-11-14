@@ -1,0 +1,10 @@
+gate,pass,detail
+G1,True,"C8 per-seed E1 means [10.93, 11.058, 10.61] < min C3 12.977 and < C7 21.986"
+G2,False,partial Spearman 18run_C1-C5+C7/mean_of_psnr=0.771; 18run_C1-C5+C7/pooled_mse_view_mean_psnr=-0.140; 15run_C1-C5/mean_of_psnr=0.633; 15run_C1-C5/pooled_mse_view_mean_psnr=0.677
+G3,False,R mean_of_psnr=1.389; pooled_mse_view_mean_psnr=0.932 (>= 1.5)
+G4,True,59.00 h for 4 runs vs cap 60
+C8_qualifies,False,G1 and G2 and G3 and G4
+B100_E5,True,ratios tgt/mean_of_psnr=5.511; tgt/pooled_mse_view_mean_psnr=3.582; plate/mean_of_psnr=7.810; plate/pooled_mse_view_mean_psnr=3.360 (>= 1.0)
+B100_qualifies,True,E5 and cap
+both_fit_cap_together,False,103.25 h
+SELECTION,,B100

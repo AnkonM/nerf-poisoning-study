@@ -1,0 +1,33 @@
+{
+ "its_per_s": 5.360877976055834,
+ "windows_seconds": {
+  "startup_to_iter500": 342.27,
+  "500_1000": 96.44,
+  "1000_1500": 95.52,
+  "1500_2000": 92.55,
+  "post_validation_2001_2499": 88.38
+ },
+ "windows_its_per_s": {
+  "startup_to_iter500": 1.461,
+  "500_1000": 5.185,
+  "1000_1500": 5.234,
+  "1500_2000": 5.403,
+  "post_validation_2001_2499": 5.646
+ },
+ "its_per_s_definition": "iterations / seconds over the four windows after the start-up window (500-1000, 1000-1500, 1500-2000, post-validation 2001-2499)",
+ "val_seconds_per_event": 464.4213697910309,
+ "val_views": 5,
+ "val_seconds_per_view": 92.88427395820618,
+ "nvidia_smi_peak_used_mib_training": 5314.0,
+ "nvidia_smi_peak_used_mib_validation": 7711.0,
+ "nvidia_smi_peak_used_mib_overall": 7711.0,
+ "gpu_total_mib": 8151,
+ "torch_max_allocated_gib": 4.6035919189453125,
+ "torch_max_reserved_gib": 8.267578125,
+ "config": "control config, iterations=2500, eval_every=2000 (only changes), seed 1, --skip-final-eval, scratch output-root",
+ "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+ "driver": "582.05",
+ "torch": "2.14.0+cu130",
+ "power": "AC (BatteryStatus 2), Balanced scheme",
+ "thermal": "SW Thermal Slowdown active during the run at 85-86 C; nvidia-smi SM clock read 217 MHz under 99% util (WSL reading)"
+}

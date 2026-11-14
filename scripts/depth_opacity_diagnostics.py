@@ -114,7 +114,8 @@ def main():
         t0 = time.time()
         torch.cuda.reset_peak_memory_stats()
         render_fn = lambda c2w, chunk: render(H, W, K, chunk=chunk, c2w=c2w, **kw)[:3]
-        d, a, chunk_used = DD.render_depth_acc(render_fn, poses, device, int(dc["chunk_size"]), int(dc["min_chunk_size"]))
+        d, a, chunk_used = DD.render_depth_acc(render_fn, poses, device, int(dc["chunk_size"]), int(dc["min_chunk_size"]),
+                                               on_view=on_view, log=lambda m: print(m, flush=True))
         depth[c], acc[c] = d, a
         peak = torch.cuda.max_memory_reserved() / 2 ** 30
         # float16 copies (never into experiments/renders/); statistics below use the float32 arrays

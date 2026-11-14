@@ -1,0 +1,28 @@
+{
+  "columns": [
+    "mean_acc_mdil",
+    "mean_abs_depth_diff_vs_control",
+    "nearest_poisoned_deg"
+  ],
+  "decision": "D-044",
+  "eval_set_aggregate_sha256": "211a5a59d85cf29447a7608e74bbe49ebe08717709d3c520bc3af549d65ab214",
+  "figure": "fig11_EXPLORATORY_depth_opacity",
+  "files": [
+    "fig11_EXPLORATORY_depth_opacity.png",
+    "fig11_EXPLORATORY_depth_opacity.pdf"
+  ],
+  "git_commit": "3e99524be4b66de133688324d16646e1859aa7f5",
+  "git_dirty_paths": [],
+  "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU",
+  "per_run_csv": "experiments/results/metrics/per_run.csv",
+  "per_run_sha256": "ba10c20623a59e9b97ef6da494d6b94146ed818101dbaf8d0f740aa8a242ac40",
+  "run_ids": [
+    "control_seed1",
+    "C3_seed1",
+    "C5_seed1",
+    "C7_seed1"
+  ],
+  "seed": 1,
+  "table": "part3",
+  "torch": "2.14.0+cu130"
+}

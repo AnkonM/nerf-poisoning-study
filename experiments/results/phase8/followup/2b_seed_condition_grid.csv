@@ -1,0 +1,193 @@
+metric,seed,condition,value,rank_in_seed_desc,residual_from_condition_mean,spread_kind
+tgt_psnr,1,control,38.74531067728291,1,0.13874456385686074,"initialisation-only (one dataset, 3 init seeds)"
+tgt_psnr,1,C1,36.42080357009989,2,1.304990487764755,view-selection + initialisation
+tgt_psnr,1,C2,33.465704015420926,3,2.020332700383392,view-selection + initialisation
+tgt_psnr,1,C3,23.438138083142565,6,-2.4595691896735445,view-selection + initialisation
+tgt_psnr,1,C4,21.389070467492388,7,-1.167639372069626,view-selection + initialisation
+tgt_psnr,1,C5,17.92741297895599,8,-0.15480153207860425,view-selection + initialisation
+tgt_psnr,1,C6,27.027066061761467,5,-2.6655168762769144,view-selection + initialisation
+tgt_psnr,1,C7,29.690730249008993,4,0.18765634136383014,"initialisation-only (one dataset, 3 init seeds)"
+tgt_psnr,2,control,38.59093599125937,1,-0.015630122166676585,"initialisation-only (one dataset, 3 init seeds)"
+tgt_psnr,2,C1,35.22687727977969,2,0.11106419744455565,view-selection + initialisation
+tgt_psnr,2,C2,29.32115031369942,5,-2.124221001338114,view-selection + initialisation
+tgt_psnr,2,C3,28.61126012016781,6,2.7135528473517,view-selection + initialisation
+tgt_psnr,2,C4,22.51478740291072,7,-0.04192243665129425,view-selection + initialisation
+tgt_psnr,2,C5,18.573027034137198,8,0.4908125231026048,view-selection + initialisation
+tgt_psnr,2,C6,31.168858164637683,3,1.4762752265993022,view-selection + initialisation
+tgt_psnr,2,C7,29.49006246760051,4,-0.01301144004465371,"initialisation-only (one dataset, 3 init seeds)"
+tgt_psnr,3,control,38.48345167173584,1,-0.12311444169020547,"initialisation-only (one dataset, 3 init seeds)"
+tgt_psnr,3,C1,33.69975839712583,2,-1.4160546852093105,view-selection + initialisation
+tgt_psnr,3,C2,31.549259615992252,3,0.10388830095471846,view-selection + initialisation
+tgt_psnr,3,C3,25.64372361513795,6,-0.2539836576781589,view-selection + initialisation
+tgt_psnr,3,C4,23.766271648282927,7,1.2095618087209132,view-selection + initialisation
+tgt_psnr,3,C5,17.746203520010592,8,-0.33601099102400056,view-selection + initialisation
+tgt_psnr,3,C6,30.88182458771599,4,1.1892416496776086,view-selection + initialisation
+tgt_psnr,3,C7,29.328429006325994,5,-0.17464490131916932,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,1,control,0.9871421932978084,1,0.00019072221128169087,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,1,C1,0.9793121033600821,2,0.015661827529912853,view-selection + initialisation
+tgt_ssim,1,C2,0.9557128113390161,3,0.02648049227678806,view-selection + initialisation
+tgt_ssim,1,C3,0.8585619377585937,6,-0.03186893281240277,view-selection + initialisation
+tgt_ssim,1,C4,0.8080561235723169,7,-0.03229830206272266,view-selection + initialisation
+tgt_ssim,1,C5,0.7038913520252644,8,-0.005359229370415219,view-selection + initialisation
+tgt_ssim,1,C6,0.9323034920414179,4,-0.015298151720281705,view-selection + initialisation
+tgt_ssim,1,C7,0.8731108850577792,5,0.0018633065164010976,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,2,control,0.9866219347772888,1,-0.0003295363092379322,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,2,C1,0.9685981164955567,2,0.0049478406653874485,view-selection + initialisation
+tgt_ssim,2,C2,0.8921411240561817,5,-0.037091195006046296,view-selection + initialisation
+tgt_ssim,2,C3,0.9247846466227128,4,0.0343537760517163,view-selection + initialisation
+tgt_ssim,2,C4,0.8408818006268797,7,0.0005273749918400794,view-selection + initialisation
+tgt_ssim,2,C5,0.7160638244279991,8,0.006813243032319449,view-selection + initialisation
+tgt_ssim,2,C6,0.9595641192102166,3,0.011962475448516918,view-selection + initialisation
+tgt_ssim,2,C7,0.8740185867278331,6,0.0027710081864549263,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,3,control,0.9870902851844829,1,0.00013881409795624133,"initialisation-only (one dataset, 3 init seeds)"
+tgt_ssim,3,C1,0.943040607634869,3,-0.0206096681953003,view-selection + initialisation
+tgt_ssim,3,C2,0.939843021791486,4,0.010610702729258015,view-selection + initialisation
+tgt_ssim,3,C3,0.8879460273316829,5,-0.002484843239313528,view-selection + initialisation
+tgt_ssim,3,C4,0.8721253527059221,6,0.03177092707088247,view-selection + initialisation
+tgt_ssim,3,C5,0.7077965677337759,8,-0.0014540136619037858,view-selection + initialisation
+tgt_ssim,3,C6,0.9509373200334642,2,0.003335676271764565,view-selection + initialisation
+tgt_ssim,3,C7,0.8666132638385221,7,-0.004634314702856024,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,1,control,0.0037568458792695916,8,5.905581670647255e-05,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,1,C1,0.008494138942895867,7,-0.012339851895640314,view-selection + initialisation
+tgt_lpips,1,C2,0.02943333013622923,6,-0.01960150769840615,view-selection + initialisation
+tgt_lpips,1,C3,0.10924039541547882,4,0.02962931564860194,view-selection + initialisation
+tgt_lpips,1,C4,0.1474176887287227,2,0.028168567765372396,view-selection + initialisation
+tgt_lpips,1,C5,0.2492820797425187,1,0.0042144864553192996,view-selection + initialisation
+tgt_lpips,1,C6,0.041660401313985664,5,0.012347636347558495,view-selection + initialisation
+tgt_lpips,1,C7,0.1363070712930828,3,0.002380728515414765,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,2,control,0.0034886780093094333,8,-0.00020911205325368576,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,2,C1,0.013416133240778751,7,-0.00741785759775743,view-selection + initialisation
+tgt_lpips,2,C2,0.07316885572923001,4,0.024134017894594635,view-selection + initialisation
+tgt_lpips,2,C3,0.052288066935573904,5,-0.02732301283130298,view-selection + initialisation
+tgt_lpips,2,C4,0.11925749323016643,3,8.372266816117357e-06,view-selection + initialisation
+tgt_lpips,2,C5,0.23649593970961494,1,-0.008571653577584465,view-selection + initialisation
+tgt_lpips,2,C6,0.022834706418940632,6,-0.006478058547486537,view-selection + initialisation
+tgt_lpips,2,C7,0.12931308632520777,2,-0.004613256452460274,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,3,control,0.0038478462991103327,8,0.00015005623654721365,"initialisation-only (one dataset, 3 init seeds)"
+tgt_lpips,3,C1,0.04059170033193393,6,0.01975770949339775,view-selection + initialisation
+tgt_lpips,3,C2,0.04450232763844687,5,-0.004532510196188506,view-selection + initialisation
+tgt_lpips,3,C3,0.07730477694957791,4,-0.0023063028172989747,view-selection + initialisation
+tgt_lpips,3,C4,0.09107218093116173,3,-0.028176940032188583,view-selection + initialisation
+tgt_lpips,3,C5,0.2494247604094646,1,0.004357167122265193,view-selection + initialisation
+tgt_lpips,3,C6,0.023443187166355208,7,-0.005869577800071961,view-selection + initialisation
+tgt_lpips,3,C7,0.13615887071471358,2,0.0022325279370455364,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,1,control,51.56675133214423,1,-0.33260845348226553,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,1,C1,48.223934151792776,6,-1.0861133585777054,view-selection + initialisation
+col_psnr,1,C2,42.968724052161505,8,-2.426029377430879,view-selection + initialisation
+col_psnr,1,C3,48.17944164562019,7,2.523692171410204,view-selection + initialisation
+col_psnr,1,C4,48.279960811355345,5,1.8668775212867956,view-selection + initialisation
+col_psnr,1,C5,48.656694263851456,4,1.0678279177184606,view-selection + initialisation
+col_psnr,1,C6,49.4372155587374,3,1.4542508025239798,view-selection + initialisation
+col_psnr,1,C7,51.15653801101318,2,0.2842059406998061,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,2,control,52.21638722456947,1,0.31702743894297924,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,2,C1,49.72463215956488,3,0.41458464919439564,view-selection + initialisation
+col_psnr,2,C2,47.40761777429156,4,2.0128643446991745,view-selection + initialisation
+col_psnr,2,C3,43.717987518920154,8,-1.9377619552898295,view-selection + initialisation
+col_psnr,2,C4,45.57388417083676,7,-0.839199119231786,view-selection + initialisation
+col_psnr,2,C5,46.15169998266464,6,-1.4371663634683571,view-selection + initialisation
+col_psnr,2,C6,47.38142600775491,5,-0.6015387484585091,view-selection + initialisation
+col_psnr,2,C7,51.42508227139637,2,0.5527502010829934,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,3,control,51.91494080016576,1,0.01558101453926497,"initialisation-only (one dataset, 3 init seeds)"
+col_psnr,3,C1,49.9815762197538,3,0.6715287093833169,view-selection + initialisation
+col_psnr,3,C2,45.8079184623241,6,0.4131650327317189,view-selection + initialisation
+col_psnr,3,C3,45.06981925808962,8,-0.5859302161203601,view-selection + initialisation
+col_psnr,3,C4,45.38540488801354,7,-1.0276784020550096,view-selection + initialisation
+col_psnr,3,C5,47.95820479188291,4,0.3693384457499178,view-selection + initialisation
+col_psnr,3,C6,47.13025270214794,5,-0.8527120540654778,view-selection + initialisation
+col_psnr,3,C7,50.03537592853059,2,-0.8369561417827853,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,1,control,0.9977934991768647,1,-6.526566998343863e-05,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,1,C1,0.9970968082124507,4,-0.00021680431767368002,view-selection + initialisation
+col_ssim,1,C2,0.9948868274397217,8,-0.0009295967157250118,view-selection + initialisation
+col_ssim,1,C3,0.9963669662249591,6,0.0005118246756667943,view-selection + initialisation
+col_ssim,1,C4,0.9964374493044023,5,0.0002681240678166219,view-selection + initialisation
+col_ssim,1,C5,0.9956449066227301,7,0.0002102157131251836,view-selection + initialisation
+col_ssim,1,C6,0.9973274626269794,2,0.00018801393721645798,view-selection + initialisation
+col_ssim,1,C7,0.9971271153880934,3,6.69147942609083e-05,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,2,control,0.9980061095376491,1,0.0001473446908010212,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,2,C1,0.9975418010203089,2,0.00022818849018446663,view-selection + initialisation
+col_ssim,2,C2,0.9966678013172382,5,0.0008513771617915111,view-selection + initialisation
+col_ssim,2,C3,0.9956137034708253,7,-0.0002414380784669934,view-selection + initialisation
+col_ssim,2,C4,0.9963789243915213,6,0.00020959915493568015,view-selection + initialisation
+col_ssim,2,C5,0.9952811175803465,8,-0.00015357332925836076,view-selection + initialisation
+col_ssim,2,C6,0.997250123157713,4,0.00011067446795010039,view-selection + initialisation
+col_ssim,2,C7,0.9974512176545483,3,0.00039101706071575926,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,3,control,0.9977766858260307,1,-8.207902081736052e-05,"initialisation-only (one dataset, 3 init seeds)"
+col_ssim,3,C1,0.9973022283576135,2,-1.1384172510897628e-05,view-selection + initialisation
+col_ssim,3,C2,0.9958946437093799,5,7.82195539331676e-05,view-selection + initialisation
+col_ssim,3,C3,0.9955847549520922,7,-0.000270386597200134,view-selection + initialisation
+col_ssim,3,C4,0.9956916020138332,6,-0.0004777232227524131,view-selection + initialisation
+col_ssim,3,C5,0.995378048525738,8,-5.6642383866933876e-05,view-selection + initialisation
+col_ssim,3,C6,0.9968407602845963,3,-0.00029868840516655837,view-selection + initialisation
+col_ssim,3,C7,0.996602268738856,4,-0.0004579318549764455,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,1,control,0.002870667925957635,8,-8.369239005642966e-05,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,1,C1,0.009961773144936254,5,0.0031469470832243005,view-selection + initialisation
+col_lpips,1,C2,0.027731050400405265,1,0.008179701824201708,view-selection + initialisation
+col_lpips,1,C3,0.013702817531771955,3,-0.005612502021591817,view-selection + initialisation
+col_lpips,1,C4,0.013517294300583313,4,-0.00644360430632967,view-selection + initialisation
+col_lpips,1,C5,0.016725661287580244,2,-0.00231357610983007,view-selection + initialisation
+col_lpips,1,C6,0.00723762071590648,7,-0.0013268758745155432,view-selection + initialisation
+col_lpips,1,C7,0.009152445978505381,6,0.0001192696199541262,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,2,control,0.0027116592346628156,8,-0.0002427010813512492,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,2,C1,0.004583549811017234,7,-0.0022312762506947192,view-selection + initialisation
+col_lpips,2,C2,0.012817058720787613,4,-0.006734289855415944,view-selection + initialisation
+col_lpips,2,C3,0.025479957895300057,1,0.006164638341936285,view-selection + initialisation
+col_lpips,2,C4,0.02313313466196118,2,0.003172236055048197,view-selection + initialisation
+col_lpips,2,C5,0.021492669138714535,3,0.002453431741304222,view-selection + initialisation
+col_lpips,2,C6,0.00886558093890002,5,0.00030108434847799653,view-selection + initialisation
+col_lpips,2,C7,0.008526709620233748,6,-0.0005064667383175066,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,3,control,0.0032807537874217437,8,0.00032639347140767886,"initialisation-only (one dataset, 3 init seeds)"
+col_lpips,3,C1,0.005899155229182369,7,-0.0009156708325295847,view-selection + initialisation
+col_lpips,3,C2,0.018105936607417793,4,-0.001445411968785764,view-selection + initialisation
+col_lpips,3,C3,0.01876318323301931,3,-0.000552136320344461,view-selection + initialisation
+col_lpips,3,C4,0.023232266858194454,1,0.0032713682512814715,view-selection + initialisation
+col_lpips,3,C5,0.01889938176593616,2,-0.00013985563147415198,view-selection + initialisation
+col_lpips,3,C6,0.00959028811645957,5,0.0010257915260375467,view-selection + initialisation
+col_lpips,3,C7,0.009420373476914636,6,0.00038719711836338044,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,1,control,12.138457127124727,8,0.03002380494272039,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,1,C1,12.299377632802258,7,-0.28434870324841377,view-selection + initialisation
+plate_psnr,1,C2,12.644091894350998,6,-0.3913412923962909,view-selection + initialisation
+plate_psnr,1,C3,14.40773771993116,4,0.7170359521519938,view-selection + initialisation
+plate_psnr,1,C4,14.762566089767546,3,0.3536002731766619,view-selection + initialisation
+plate_psnr,1,C5,16.648692541614423,1,0.02408488625722427,view-selection + initialisation
+plate_psnr,1,C6,13.715029361591863,5,0.6740060196961029,view-selection + initialisation
+plate_psnr,1,C7,15.419261788965654,2,0.043868608837790646,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,2,control,12.14166762823597,8,0.033234306053962825,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,2,C1,12.421709167011809,7,-0.16201716903886343,view-selection + initialisation
+plate_psnr,2,C2,13.543506304760315,4,0.5080731180130265,view-selection + initialisation
+plate_psnr,2,C3,13.180046187758615,5,-0.5106555800205506,view-selection + initialisation
+plate_psnr,2,C4,14.444221516189279,3,0.035255699598394585,view-selection + initialisation
+plate_psnr,2,C5,16.41875235272574,1,-0.20585530263145912,view-selection + initialisation
+plate_psnr,2,C6,12.75342902232039,6,-0.28759431957537096,view-selection + initialisation
+plate_psnr,2,C7,15.338719829309643,2,-0.036673350818221095,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,3,control,12.045175211185326,8,-0.06325811099668144,"initialisation-only (one dataset, 3 init seeds)"
+plate_psnr,3,C1,13.030092208337946,5,0.44636587228727365,view-selection + initialisation
+plate_psnr,3,C2,12.918701361130548,6,-0.11673182561674089,view-selection + initialisation
+plate_psnr,3,C3,13.484321395647719,4,-0.20638037213144678,view-selection + initialisation
+plate_psnr,3,C4,14.020109843815826,3,-0.38885597277505823,view-selection + initialisation
+plate_psnr,3,C5,16.806378071731434,1,0.18177041637423486,view-selection + initialisation
+plate_psnr,3,C6,12.654611641775029,7,-0.3864117001207319,view-selection + initialisation
+plate_psnr,3,C7,15.368197922108296,2,-0.007195258019567774,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,1,control,0.06305451224459589,1,-0.0005514638447519371,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,1,C1,0.061168791831583295,2,0.0027273079420985988,view-selection + initialisation
+plate_mse,1,C2,0.057255684056705114,3,0.0026046729814648076,view-selection + initialisation
+plate_mse,1,C3,0.04505675066027049,7,-0.007327480779230337,view-selection + initialisation
+plate_mse,1,C4,0.04839253546844459,5,-0.002526359851943487,view-selection + initialisation
+plate_mse,1,C5,0.036727338871154105,8,-0.00027990649969848735,view-selection + initialisation
+plate_mse,1,C6,0.04788383093058812,6,-0.00722593721623601,view-selection + initialisation
+plate_mse,1,C7,0.05329306325459974,4,0.0005419732502505714,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,2,control,0.06321734011575265,1,-0.000388635973595175,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,2,C1,0.05923754967990948,2,0.0007960657904247867,view-selection + initialisation
+plate_mse,2,C2,0.05067213629122219,7,-0.003978874784018115,view-selection + initialisation
+plate_mse,2,C3,0.05504696026367778,4,0.002662728824176952,view-selection + initialisation
+plate_mse,2,C4,0.05215193490917684,6,0.001233039588788766,view-selection + initialisation
+plate_mse,2,C5,0.04269728520103134,8,0.005690039830178746,view-selection + initialisation
+plate_mse,2,C6,0.05763243341427987,3,0.0025226652674557384,view-selection + initialisation
+plate_mse,2,C7,0.05278732535879022,5,3.623535444105541e-05,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,3,control,0.06454607590769494,1,0.0009400998183471121,"initialisation-only (one dataset, 3 init seeds)"
+plate_mse,3,C1,0.05491811015696131,5,-0.0035233737325233855,view-selection + initialisation
+plate_mse,3,C2,0.056025212877793606,4,0.0013742018025533,view-selection + initialisation
+plate_mse,3,C3,0.057048983394554206,3,0.004664751955053378,view-selection + initialisation
+plate_mse,3,C4,0.052212215583542804,6,0.0012933202631547278,view-selection + initialisation
+plate_mse,3,C5,0.031597112040372334,8,-0.005410133330480259,view-selection + initialisation
+plate_mse,3,C6,0.059813040095604404,2,0.0047032719487802715,view-selection + initialisation
+plate_mse,3,C7,0.05217288139965755,7,-0.0005782086046916199,"initialisation-only (one dataset, 3 init seeds)"

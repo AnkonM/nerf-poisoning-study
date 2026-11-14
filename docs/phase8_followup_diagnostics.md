@@ -315,3 +315,28 @@ chosen post hoc in D-043 and are used only for comparability; control has no poi
 - The second Part 3 run did not compute the C7 angle relation (its dataset id is `C7`, not `C7_seed1`) and the opacity
   panel of Fig 11 used an offset axis that was hard to read. Both were fixed and Part 3 was re-run in full; the tables
   and figure above are from the final run.
+
+## Addendum (Phase 9 task, Part 5): depth noise floor — EXPLORATORY, descriptive only
+
+Procedure: the D-044 Part 3 render path (final checkpoints, fine network, perturb 0, fp32, 400x400, 75 views, GPU, ray chunk 2048,
+no out-of-memory halving needed; new RGB matched the stored renders at 79.3 dB, max abs diff 0.0002) for seeds 2 and 3 of
+control, C3, C5 and C7; seed 1 from the D-044 float16 arrays. All differences below are computed on float16-rounded depth;
+recomputing the D-044 quantities that way gives 0.04366 / 0.04847 / 0.04670 (C3 / C5 / C7 vs control, seed 1), equal to the
+D-044 float32 values to the digits shown. Quantity: mean over M_dil of |depth_a - depth_b|, summarised over the 75 views
+(scene units). Table: `experiments/results/phase8/followup/part5_depth_noise_floor.csv` (script `scripts/depth_noise_floor.py`,
+config `configs/analysis/phase9_depth_noise_floor.yaml`).
+
+| comparison | seeds 1-2 | seeds 1-3 | seeds 2-3 | what differs between the two models |
+|---|---|---|---|---|
+| control vs control | 0.0200 | 0.0193 | 0.0056 | initialisation / batch order (one dataset) |
+| C7 vs C7 | 0.0068 | 0.0067 | 0.0055 | initialisation only (one dataset) |
+| C3 vs C3 | 0.0460 | 0.0351 | 0.0232 | poisoned view set AND initialisation |
+| C5 vs C5 | 0.0204 | 0.0155 | 0.0181 | poisoned view set AND initialisation |
+
+Beside these, the D-044 values (condition at seed 1 vs control at seed 1) were C3 0.0437, C5 0.0485, C7 0.0467.
+
+Descriptive observations: the control-vs-control differences (0.0056-0.0200) and the C3 / C5 same-condition seed-pair differences
+(0.0155-0.0460) are of the same order as, or in the C3 case equal to, the D-044 condition-vs-control values; C7 same-condition
+pairs are smaller (0.0055-0.0068). The seed-1 control differs from the seed-2 and seed-3 controls by about 3.5x the 2-3 difference.
+Limits: three seeds, one scene, one pair per cell, no ground-truth depth; a depth difference is a difference between two models.
+Not answered here: how much of the D-044 depth differences is attributable to the poisoning rather than to seed-to-seed variation.

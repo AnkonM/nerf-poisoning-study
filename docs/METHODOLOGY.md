@@ -213,3 +213,7 @@ computed. §1-§7 are unchanged.
 **Clarification 2026-11-05 (not a deviation):** the Phase 8 analysis plan (aggregation, comparison pairs, exploratory
 diagnostics, qualitative-figure rule) is pre-registered in `DECISION_LOG.md` D-043, before any aggregate was computed.
 §1-§7 are unchanged.
+
+**Clarification 2026-11-14 (not a deviation):** the Phase 8 follow-up diagnostics (paired C3/C6 differences, seed-by-condition
+grids, mean-of-MSE aggregates, per-view spread, exploratory depth/opacity at seed 1) are pre-registered as descriptive or
+exploratory in `DECISION_LOG.md` D-044, before they were computed. §1-§7 and the D-042/D-043 definitions are unchanged.

@@ -2675,3 +2675,84 @@ in `status`, but is not killed automatically); power or temperature alerts.
 - **Language rule.** No causal language in outputs; hypotheses are labelled as hypotheses; surprising results are
   reported, not explained away. Figures carry a sidecar JSON (per_run.csv sha256, run_ids, columns, git commit).
 - **Reversibility.** Additive; analysis code and outputs are derived from existing metrics and can be regenerated.
+
+
+## D-044 — Phase 8 follow-up diagnostics (pre-registration; exploratory)
+
+- **Date:** 2026-11-14
+- **Scope:** fixes, BEFORE anything below is computed, a set of descriptive follow-up diagnostics on the existing Phase 8
+  outputs, plus one exploratory GPU diagnostic (depth/opacity). Everything here is **descriptive or exploratory
+  (post-hoc-motivated, prompted by the Phase 8 closeout checks and the open questions in
+  `docs/RESULTS_DRAFT_phase8.md`)**. It adds no primary metric, changes no D-042/D-043 definition, and does not change
+  `per_run.csv`, any existing metrics output, renders, checkpoints or frozen data. METHODOLOGY §1-§7 are unchanged.
+  Primary aggregates stay exactly as pre-registered in D-043 (mean over seeds of the per-run value, sample std ddof=1).
+  No p-values; no causal language; hypotheses are labelled as hypotheses.
+- **Configuration.** Every parameter below lives in `configs/analysis/phase8_followup_d044.yaml`; scripts take that path.
+- **Part 2 (tables from existing CSVs only; `experiments/results/phase8/followup/`).**
+  - **2a. Paired C3 vs C6.** C3 and C6 are paired by seed. Precondition, asserted before any table is written: for each
+    seed, the sets of poisoned view indices of `C3_seed<s>` and `C6_seed<s>` in `data/poisoned/MANIFEST.csv` are
+    identical (the closeout check found this; it is re-asserted). Per seed and per D-043 pair metric (`tgt_psnr`,
+    `tgt_ssim`, `tgt_lpips`, `col_psnr`, `col_ssim`, `col_lpips`, `plate_psnr`, `plate_mse`) the difference is
+    **C6 minus C3**. Reported: the three per-seed differences, their mean and sample std (ddof=1), and sign consistency
+    (number of seeds with a positive / negative difference; "consistent" = all three non-zero and of one sign).
+    Pairing by seed means the same poisoned views AND the same init / batch-order seed (code reading in the closeout
+    checks; not a bitwise guarantee).
+  - **2b. Seed-by-condition grid.** For each D-043 pair metric: the 3 x 8 grid of per-run values (rows seeds 1-3,
+    columns control, C1..C7); the per-seed rank of the 8 conditions (rank 1 = largest value, for every column,
+    regardless of whether larger is better); the residual of each value from its condition mean over seeds; the mean
+    residual per seed; and the Pearson correlation, over the 8 conditions, between the residual vectors of each pair of
+    seeds. Descriptive: to show whether seed-level variation is shared across conditions. control and C7 are
+    initialisation-only variation (one dataset) and are labelled so.
+  - **2c. Mean-of-MSE aggregates.** The D-043 aggregate is, per run, the mean over views of per-view PSNR
+    (`per_run.csv`). The alternative computed here, per run and region (target = M_dil, collateral = complement,
+    plate = plate distance over M_dil), is the MSE pooled over the 75 views and then converted to PSNR
+    (-10 log10 MSE, data range 1). Per-view MSE is recovered from the per-view CSV as 10^(-PSNR/10) (plate: `plate_mse`
+    directly); a view with infinite PSNR contributes MSE 0. Two pooling variants are written side by side:
+    **pixel-weighted** (per-view MSE weighted by that view's region pixel count `n_tgt_px` / `n_col_px`; plate uses
+    `n_tgt_px`) and **view-mean** (unweighted mean of per-view MSE). Per condition: mean over seeds and per-seed range
+    of each aggregate, beside the D-043 mean-of-PSNR values. Asserted first: the mean of the per-view PSNRs equals the
+    `per_run.csv` value (1e-9 dB). Separation statement: for all 28 condition pairs and the three regions, "ranges
+    overlap / are separated" (the D-043 rule: per-seed [min, max] intervals) under each aggregate; every pair whose
+    statement differs between the D-043 aggregate and either alternative is flagged. This does not replace the D-043
+    aggregate; it only reports where the choice matters.
+  - **2d. Farther from both references.** For control, C3, C5, C6, C7 (all 3 seeds), per eval view, in terms of
+    target-region (M_dil) MSE: d_gt = MSE(render, clean GT), d_plate = `plate_mse`, d_ref = MSE(clean GT, plate) from
+    `reference_gt_vs_plate.csv`. The view is flagged when d_gt > d_ref AND d_plate > d_ref (strictly). Reported per run:
+    count and fraction of the 75 views flagged, and for context the counts with d_gt > d_ref only and with
+    d_plate > d_ref only. Numbers only.
+  - **2e. Spread of per-view target PSNR.** For control and each poisoned condition, per run (75 views) and pooled over
+    the three seeds (225 values): IQR (Q3 - Q1, numpy linear interpolation), range (max - min), median, and the ratio
+    of the pooled IQR to the control's pooled IQR.
+- **Part 3 (exploratory; depth and opacity; control, C3, C5, C7 at seed 1 only).**
+  - Uses the existing render path (`nerf.rendering.render`, `nerf.training._build_model` / `_render_kwargs` with the
+    run's own config and test-mode settings: perturb 0, no noise, fp32, no AMP/TF32 enabled by this code) on each
+    run's final checkpoint (`experiments/runs/<run>/200000.tar`, the same file the stored renders came from; sha256
+    compared with `render_meta.json`), at 400x400, over all 75 eval views, under `torch.no_grad()`. Outputs come from
+    the fine network. Accumulated opacity = `acc_map`. Expected depth = `1 / disp_map` = sum(w z) / sum(w), the
+    acc-normalised expected ray-termination distance in scene units (near 1.5, far 9.0); it is derived from existing
+    outputs, no change to `src/nerf`. Pixels with very small `acc_map` still have a well-defined (weighted-mean) value.
+  - Ray chunk starts at 2048 and is halved on a CUDA out-of-memory error down to a minimum of 256; if 256 fails the
+    run stops and reports. **No CPU fallback.** Arrays are written as float16 to
+    `experiments/renders_diagnostics/<run>/depth_acc_fp16.npz` (git-ignored; never into `experiments/renders/`).
+    Summary statistics are computed from the float32 arrays held in memory before the float16 cast (assumption stated).
+  - Per view, over M_dil (the D-042 target region): mean accumulated opacity, and mean absolute difference between the
+    run's expected depth and the **control seed-1** model's expected depth (control itself is 0 by definition).
+    Per condition over the 75 views: mean, median, Q1, Q3, min, max. Relation to geometry: the Spearman rank
+    correlation (descriptive, no test) of the per-view depth difference with the angular distance to the nearest
+    poisoned training view (reusing `metrics.aggregate.nearest_angular_distance_deg` and
+    `positions_from_transforms`, poisoned views from `MANIFEST.csv`), and per-bin means for the E2 thresholds
+    (<10, 10-20, >20 degrees; **these thresholds were chosen post hoc in D-043 E2 and are kept only for comparability**).
+    control has no poisoned views and is the reference.
+  - Sanity (reported, not a gate): the newly rendered RGB is compared with the stored `renders_fp16.npz` of the same run
+    (mean per-view PSNR between them and the maximum absolute difference). A different GPU from the HPC one means
+    bitwise equality is not expected (D-027).
+  - **Stated limits.** Accumulated opacity cannot tell the mug from the opaque surface behind it: a ray that ends on
+    the table has opacity near 1 whether or not the mug is represented. There is no ground-truth depth for the plate
+    scene, so depth is compared with the control model's depth only, and a difference is a difference between two
+    models, not an error against geometry. One seed per condition, so no between-seed statement is possible.
+- **Outputs.** CSVs under `experiments/results/phase8/followup/`, figures under `paper/figures/` (2a, 2e, Part 3; PNG,
+  PDF, sidecar JSON with the `per_run.csv` sha256, run ids, columns and git commit; EXPLORATORY in the title of exploratory
+  ones), write-up `docs/phase8_followup_diagnostics.md` (descriptive only; limitations and open questions listed, not
+  answered).
+- **Reversibility.** Additive; every output is derived from existing files and can be regenerated; the GPU outputs
+  are git-ignored.

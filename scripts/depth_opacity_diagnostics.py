@@ -147,7 +147,7 @@ def main():
         mean_acc = DD.region_mean(acc[c], m_dil)
         mean_depth = DD.region_mean(depth[c], m_dil)
         diff = DD.region_mean_abs_diff(depth[c], depth[ref_cond], m_dil)
-        pv = pois.get(rid)
+        pv = pois.get(rid) or pois.get(c)       # C7's single dataset id in MANIFEST.csv is 'C7' (D-043 E2)
         near = (A.nearest_angular_distance_deg(ev_pos, tr_pos[sorted(pv)]) if pv else None)
         per_view[c] = {"mean_acc": mean_acc, "nearest_deg": near}
         if c != ref_cond:

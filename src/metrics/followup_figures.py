@@ -63,13 +63,14 @@ def depth_figure(per_view: Dict[str, Dict[str, np.ndarray]], bins_deg: Sequence[
     conds = list(per_view)
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(13, 4.8))
     for i, c in enumerate(conds):
-        o = per_view[c]["mean_acc"]
+        o = 1.0 - per_view[c]["mean_acc"]        # shown as 1 - opacity: every value is 1 to ~1e-7, so the raw axis is unreadable
         ax0.scatter(i + np.random.default_rng(0).uniform(-0.15, 0.15, o.size), o, s=8, alpha=0.55, color=COND_COLOR[c])
         q1, med, q3 = np.percentile(o, [25, 50, 75])
         ax0.vlines(i, q1, q3, color="black", lw=3); ax0.scatter([i], [med], color="white", edgecolor="black", s=26, zorder=5)
     ax0.set_xticks(range(len(conds))); ax0.set_xticklabels(conds); ax0.grid(alpha=0.3, axis="y")
-    ax0.set_ylabel("mean accumulated opacity over M_dil (per eval view)")
-    ax0.set_title("opacity (fine network); bar = IQR, circle = median", fontsize=9)
+    ax0.set_ylabel("1 - mean accumulated opacity over M_dil (per eval view)")
+    ax0.ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useOffset=False)
+    ax0.set_title("1 - opacity (fine network); bar = IQR, circle = median", fontsize=9)
     for c in conds:
         d = per_view[c]
         if "depth_abs_diff" in d and d.get("nearest_deg") is not None:

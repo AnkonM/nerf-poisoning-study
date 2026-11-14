@@ -62,7 +62,11 @@ def export_loss_png(run_dir: str, out_png: str) -> bool:
     return True
 
 
-def write_run_record(cfg, run, iterations: int, rd: str, ev: Dict, pf: Dict) -> None:
+def write_run_record(cfg, run, iterations: int, rd: str, ev: Dict, pf: Dict, where_run=None, note=None,
+                     row_extra=None, append_fn=None) -> None:
+    """Optional kwargs (Phase 9, additive; defaults reproduce the Phase 6 record exactly): `where_run` replaces the
+    'Where run' text, `note` is appended to the log's Notes, `row_extra` adds columns to the results row and
+    `append_fn(csv_path, row)` replaces the results.csv appender."""
     paths = cfg.paths
     events = st.read_events(rd)
     starts = [e for e in events if e["event"] in ("start", "resume")]
@@ -107,7 +111,7 @@ def write_run_record(cfg, run, iterations: int, rd: str, ev: Dict, pf: Dict) -> 
 
 ## Environment
 
-- **Where run:** local — native Ubuntu 24.04 HPC machine (D-038), host `{env.get("hostname", NOT_MEASURED)}`
+- **Where run:** {where_run or "local — native Ubuntu 24.04 HPC machine (D-038)"}, host `{env.get("hostname", NOT_MEASURED)}`
 - **GPU:** {env.get("gpu", NOT_MEASURED)} (driver {env.get("driver", NOT_MEASURED)}, persistence mode {env.get("persistence_mode", NOT_MEASURED)})
 - **PyTorch / CUDA versions:** {env.get("torch", NOT_MEASURED)} / build {env.get("cuda_build", NOT_MEASURED)}
 - **CPU governor:** {env.get("cpu_governor", NOT_MEASURED)}
@@ -144,7 +148,7 @@ def write_run_record(cfg, run, iterations: int, rd: str, ev: Dict, pf: Dict) -> 
 
 ## Notes
 
-All checkpoints (every 25,000 iterations plus the final one) are retained under `runs/{run.run_id}/` so the METHODOLOGY §6 metrics can be computed later against the frozen eval set. Whole-frame PSNR is relative to this scene's own control only (D-034): never compare it with published NeRF numbers.
+All checkpoints (every 25,000 iterations plus the final one) are retained under `runs/{run.run_id}/` so the METHODOLOGY §6 metrics can be computed later against the frozen eval set. Whole-frame PSNR is relative to this scene's own control only (D-034): never compare it with published NeRF numbers.{(chr(10) + chr(10) + note) if note else ""}
 """
     tmp = os.path.join(paths.logs, run.run_id + ".md.tmp")
     with open(tmp, "w") as f:
@@ -169,4 +173,5 @@ All checkpoints (every 25,000 iterations plus the final one) are retained under 
         "hardware": "%s | driver %s | torch %s" % (env.get("gpu"), env.get("driver"), env.get("torch")),
         "finished_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    st.append_results_row(paths.results_csv, row)
+    row.update(row_extra or {})
+    (append_fn or st.append_results_row)(paths.results_csv, row)

@@ -1,0 +1,31 @@
+# Phase 9 laptop queue + hardware profile (DECISION_LOG.md D-045 / D-046). Opt-in: scripts/run_phase9_queue.py
+# --hardware-profile laptop_phase9. The Phase 6 sweep (scripts/run_sweep.py), its queue, pin and results.csv are untouched.
+
+profile: laptop_phase9
+
+hardware:            # fail closed if ANY of these differ (a different machine/driver/torch build adds a hardware confound)
+  gpu_name: "NVIDIA GeForce RTX 5060 Laptop GPU"
+  driver: "582.05"
+  torch: "2.14.0+cu130"
+  hostname: "Legiondary"
+
+preflight:
+  # Laptop GPU memory: the Windows desktop holds ~1845 MiB (measured 2026-11-14). The measured training+validation
+  # peak of one run is 7711 MiB total used (speed test), i.e. ~5866 MiB attributable to the run, on a card with 8151 MiB;
+  # so a baseline above 8151 - 5866 = 2285 MiB leaves no room. Limit set to 2200 MiB (baseline + ~355 MiB margin).
+  # (The Phase 6 harness default is 2048 MiB for a 16 GB card with a 588 MiB baseline.)
+  gpu_mem_max_mib: 2200
+  gpu_wait_s: 30
+  min_free_gb: 20
+
+paths:
+  results_csv: experiments/results/results_phase9.csv     # same row schema as results.csv + a hardware_profile column
+  run_id_prefix: lp9_                                      # keeps run dirs/log entries distinct from the HPC runs (e.g. C3_seed1)
+
+queue:               # executed in this order, one process at a time
+  config_dir: configs/poisoning
+  entries:
+    - {role: calibration, condition_id: C3, config: budget_20.yaml, seeds: [1]}
+    - {role: option, condition_id: B100, config: budget_100.yaml, seeds: [1, 2, 3]}
+  optional:          # not queued: D-046 projects 59.0 h for the four runs above against the 60 h cap; these add ~29.5 h
+    - {role: calibration_extra, condition_id: C3, config: budget_20.yaml, seeds: [2, 3], enabled: false}

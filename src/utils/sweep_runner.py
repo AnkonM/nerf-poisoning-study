@@ -109,6 +109,15 @@ class Sweep:
         rec("disk space", *chk.check_disk(c.paths.runs, c.min_free_gb))
         gpu_ok, d, snap = chk.check_gpu(c.gpu_mem_max_mib, c.gpu_wait_s)
         rec("GPU free", gpu_ok, d)
+        self._hardware_checks(snap, create_pin, rec)
+        failed = [(n, d) for n, ok, d in results if not ok]
+        return {"ok": not failed, "failed": failed, "checks": results, "warnings": warnings,
+                "commit": commit, "gpu": snap, "env": chk.environment_record(snap) if snap else {}}
+
+    def _hardware_checks(self, snap, create_pin, rec):
+        """Hardware identity gate. Phase 6: pin to ONE GPU/driver/torch (D-038). Overridden by the opt-in Phase 9
+        profile (utils.phase9_harness); the Phase 6 behaviour is this method's body, unchanged."""
+        c = self.cfg
         try:
             ident = chk.hardware_identity(snap)
             if create_pin:
@@ -117,10 +126,6 @@ class Sweep:
                 rec("hardware pin", *chk.check_hardware_pin(c.paths.hw_pin, ident))
         except Exception as e:  # noqa: BLE001
             rec("hardware pin", False, "could not determine hardware identity: %s" % e)
-            ident = {}
-        failed = [(n, d) for n, ok, d in results if not ok]
-        return {"ok": not failed, "failed": failed, "checks": results, "warnings": warnings,
-                "commit": commit, "gpu": snap, "env": chk.environment_record(snap) if snap else {}}
 
     def _require_preflight(self, run: Run) -> Dict:
         pf = self.preflight(run)
@@ -358,9 +363,12 @@ class Sweep:
         except StopQueue as e:
             st.append_event(rd, "failed", reason=e.reason)
             raise
+        self._write_record(run, iterations, rd, ev, pf)
+        self.say("[%s] COMPLETE (test PSNR %.3f dB over %d views)" % (run.run_id, ev["test_psnr"], ev["n_test_views"]))
+
+    def _write_record(self, run: Run, iterations: int, rd: str, ev: Dict, pf: Dict) -> None:
         from utils.sweep_record import write_run_record
         write_run_record(self.cfg, run, iterations, rd, ev, pf)
-        self.say("[%s] COMPLETE (test PSNR %.3f dB over %d views)" % (run.run_id, ev["test_psnr"], ev["n_test_views"]))
 
     # ----------------------------------------------------------------- queue
     def queue(self) -> List[Run]:

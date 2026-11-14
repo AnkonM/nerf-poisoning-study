@@ -1,0 +1,48 @@
+# Condition B100 — Phase 9 EXTENSION (DECISION_LOG.md D-045/D-046): 100% budget anchor. NOT in the METHODOLOGY §5 matrix.
+#
+# METHODOLOGY.md is FROZEN (2026-09-14). The values below implement §5's
+# conditions matrix; they do not reinterpret it.
+#
+# NOTE there is deliberately no `mask_dilation_px` here. §3 fixes the dilation
+# once for the whole study (3 px, D-024) and it is inherited from
+# ../scenes/final_scene.yaml as render.background_plate.mask_dilation_px.
+# A pre-Phase-4 scaffold of this file carried a contradicting `mask_dilation_px: 4`
+# under `poisoning:` — a silent second source of truth. See DECISION_LOG.md D-028.
+
+defaults:
+  - ../base.yaml
+  - ../scenes/final_scene.yaml
+
+condition_id: B100
+
+poisoning:
+  budget_percent: 100     # percent of V_target (=100): every target-visible view is poisoned. Extends the §2 budget list (D-045, §10 line)
+  attack_type: hard_erasure
+  view_selection: random
+  alpha: null       # only used when attack_type == soft_suppression (§3)
+
+# METHODOLOGY.md §8: view selection uses the SAME seed set as model
+# initialisation, so each seed yields its own poisoned dataset (D-028).
+seeds: [1, 2, 3]
+
+dataset:
+  # `path` is explicitly NULL, and that is load-bearing (D-032).
+  #
+  # Until Phase 6 this key was simply absent here, which meant it was INHERITED
+  # from ../scenes/final_scene.yaml as `data/blender_scenes` — the clean scene.
+  # Every condition config therefore resolved to the unpoisoned training set,
+  # and `scripts/train.py configs/poisoning/budget_20.yaml` would have trained
+  # the control while labelling the result C3, with no error and no warning.
+  # Setting it null makes that silent path impossible: src/nerf/training.py
+  # raises rather than falling back to a scene-wide default.
+  #
+  # The real training set is resolved per (condition, seed) from the template
+  # below by src/utils/dataset_id.py, which then verifies the resolved directory
+  # by CONTENT — asserting that exactly round(budget/100 × |V_target|) of its
+  # images differ from the clean originals — before a single gradient step runs.
+  path: null
+  path_template: "data/poisoned/{dataset_id}"
+  # val and the FROZEN eval_holdout are read straight from their single
+  # canonical location — never copied or symlinked per condition (D-028).
+  val_path: data/blender_scenes
+  test_path: data/blender_scenes

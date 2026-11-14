@@ -96,3 +96,77 @@ def test_e1_stats_and_hours():
     s = P.e1_stats([1.0, 2.0, 9.0])
     assert s == {"mean_deg": 4.0, "median_deg": 2.0, "max_deg": 9.0}
     assert P.hours_per_run(36000, 10.0, 2, 60.0, 120.0) == pytest.approx(1.0 + 240.0 / 3600.0)
+
+
+# ---- poisoning/verify.py (Phase 5 gate checks) -------------------------------------------------
+import json as _json
+import os as _os
+
+import imageio.v2 as _iio
+
+from poisoning import verify as V
+
+
+def test_check_image_pair_outside_mask_identity():
+    orig = np.full((8, 8, 3), 100, np.uint8)
+    mask = np.zeros((8, 8), bool)
+    mask[2:5, 2:5] = True
+    ok = orig.copy()
+    ok[3, 3] = 7                                        # change inside the mask only
+    assert V.check_image_pair(orig, ok, mask, True) == []
+    bad = ok.copy()
+    bad[7, 7] = 1                                       # change outside the mask
+    assert any("OUTSIDE" in p for p in V.check_image_pair(orig, bad, mask, True))
+    assert any("identical" in p for p in V.check_image_pair(orig, orig.copy(), mask, True))
+    assert any("not flagged" in p for p in V.check_image_pair(orig, ok, mask, False))
+
+
+def test_dilate_grows_by_the_radius():
+    m = np.zeros((9, 9), bool)
+    m[4, 4] = True
+    assert V.dilate(m, 0).sum() == 1 and V.dilate(m, 2).sum() == 25
+
+
+def _synthetic_dataset(tmp_path, n=4, poisoned=(1, 3), break_outside=False, break_copy=False):
+    scene, ds, masks = tmp_path / "scene", tmp_path / "ds", tmp_path / "masks"
+    for d in (scene / "train", ds / "train", masks):
+        d.mkdir(parents=True)
+    frames = [{"file_path": "./train/r_%03d" % i, "transform_matrix": np.eye(4).tolist()} for i in range(n)]
+    tj = {"camera_angle_x": 0.7, "frames": frames}
+    for d in (scene, ds):
+        _json.dump(tj, open(d / "transforms_train.json", "w"))
+    rows = []
+    for i in range(n):
+        img = np.full((10, 10, 3), 50 + i, np.uint8)
+        _iio.imwrite(scene / "train" / ("r_%03d.png" % i), img)
+        m = np.zeros((10, 10), np.uint16)
+        m[4:6, 4:6] = 65535
+        _iio.imwrite(masks / ("r_%03d.png" % i), m)
+        out = img.copy()
+        if i in poisoned:
+            out[4:6, 4:6] = 0
+            if break_outside and i == poisoned[0]:
+                out[0, 0] = 255
+        if break_copy and i == 0:
+            out = img.copy()
+            out[9, 9] = 1
+        _iio.imwrite(ds / "train" / ("r_%03d.png" % i), out)
+        rows.append({"view_index": str(i), "poisoned": str(i in poisoned)})
+    return scene, ds, masks, rows
+
+
+def _read_mask(p):
+    m = _iio.imread(p)
+    return m > 0, None
+
+
+def test_verify_dataset_pass_and_each_failure(tmp_path):
+    scene, ds, masks, rows = _synthetic_dataset(tmp_path)
+    r = V.verify_dataset(str(ds), str(scene), rows, 2, str(masks), 0, _read_mask, expect_views=4)
+    assert r["problems"] == [] and r["n_poisoned"] == 2
+    assert any("expected exactly 3" in p for p in V.verify_dataset(str(ds), str(scene), rows, 3, str(masks), 0,
+                                                                   _read_mask, expect_views=4)["problems"])
+    s2, d2, m2, r2 = _synthetic_dataset(tmp_path / "b", break_outside=True)
+    assert any("OUTSIDE" in p for p in V.verify_dataset(str(d2), str(s2), r2, 2, str(m2), 0, _read_mask, expect_views=4)["problems"])
+    s3, d3, m3, r3 = _synthetic_dataset(tmp_path / "c", break_copy=True)
+    assert any("byte-identical" in p for p in V.verify_dataset(str(d3), str(s3), r3, 2, str(m3), 0, _read_mask, expect_views=4)["problems"])

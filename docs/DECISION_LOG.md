@@ -2756,3 +2756,100 @@ in `status`, but is not killed automatically); power or temperature alerts.
   answered).
 - **Reversibility.** Additive; every output is derived from existing files and can be regenerated; the GPU outputs
   are git-ignored.
+
+## D-045 — Phase 9 decision rule (pre-registration; recorded BEFORE any decision evidence is computed)
+
+- **Date:** 2026-11-14
+- **Purpose.** The project lead asked that the choice of Phase 9 experiment be data-backed. "Better" means most
+  informative per laptop hour, NOT the outcome that would look most favourable. This entry fixes the candidate
+  options, the evidence quantities, a mechanical decision rule with its thresholds, and the predictions for the
+  chosen option, before the evidence script is run. METHODOLOGY §1-§7 and the D-032..D-035 / D-042 / D-043 / D-044
+  definitions are unchanged. Any result of the chosen run is reported as it comes out.
+
+### A. Scope
+- D-038 ("hardware is never mixed inside the sweep", Quadro RTX 5000) was written for the Phase 6 sweep only and is
+  unchanged for it. Phase 9 runs on the laptop (WSL2, RTX 5060 8 GB, Blackwell sm_120); that is a new, separate decision
+  recorded here.
+- Phase 9 is a labelled **extension beyond the METHODOLOGY §5 matrix**. Any condition added here (C8, B100) is outside
+  the pre-registered matrix and is reported as an extension, never merged into the §5 results.
+- Phase 8 items open when this entry is written: the loss-curve sign-off (D-041) and the Phase 7 closure. The ROADMAP gate
+  "Phase 9 only after Phase 8 is complete and written up" is **knowingly waived by the project lead**.
+- Locked items stay locked: eval_holdout, results.csv and its schema, per_run.csv, renders, checkpoints, the 20 Phase 5
+  poisoned datasets, the Phase 6 harness behaviour and tests. No AMP/fp16/TF32.
+
+### B. Candidate options
+- **C8** — 20 % hard erasure with **coverage-controlled selection**, seeds 1-3. Selection rule: farthest-point sampling
+  (FPS) over the camera directions of the 100 training views. Direction = unit vector from the scene origin to the camera
+  position (translation column of the pose). Metric = angle (arccos of the clipped dot product). The first view is a
+  seeded draw (`numpy.random.default_rng(seed)`, index drawn over the training view indices sorted ascending, seed = the
+  run seed); each next view maximises the minimum angular distance to the already-selected set; ties (within 1e-12 rad)
+  resolve to the lowest view index; 20 views (20 % of |V_target| = 100; |V_target| equals the 100 training views in this
+  scene). Implemented as a named function `sample_farthest_point` in `src/poisoning/view_selection.py` and referenced
+  **by name** in the config. Everything else is identical to C3 (hard erasure, same compositor, alpha unused, same
+  training config).
+- **B100** — 100 % budget anchor, hard erasure, random selection (all 100 target-visible views), seeds 1-3. This extends the
+  §2 budget list; the §10 line below covers it.
+- **RP** — real-photo spot-check. **NF** — Nerfacto cross-model check. **NONE** — no Phase 9, write up.
+
+### C. Cost cap
+60 laptop hours in total, calibration included. Hours per run = 200000 / (measured it/s) / 3600 plus the validation and
+final-eval overhead, both measured in the speed test (Part 3 of the task). Run counts: calibration (C3 seed 1) + 3 runs of
+the chosen option = 4 runs. "Fits the cap" means projected hours for that run list <= 60.
+
+### D. Evidence quantities (descriptive; computed from existing data, poses and the manifest; no training)
+- **E1.** Per condition and seed: over the 75 eval views, the angle between the eval camera position and the nearest
+  POISONED training camera position (vectors from the origin); mean, median, max. Function reused:
+  `metrics.aggregate.nearest_angular_distance_deg` (the D-043 E2 function). C7's dataset is seed-invariant, so its three
+  per-seed values coincide.
+- **E2.** For the planned C8 selection at seeds 1-3 (computed from the rule in B, no training, no dataset built): its E1
+  statistic.
+- **E3.** Partial Spearman rank correlation between the per-run E1 mean and the per-run target-region PSNR, controlling for
+  budget: rank-transform (average ranks for ties) E1 mean, target PSNR and budget; take the residuals of E1-rank and
+  PSNR-rank each from an OLS fit on budget-rank; Pearson correlation of the two residual vectors. Over the 18
+  hard-erasure runs C1-C5 and C7 (3 seeds each), under BOTH aggregates; repeated over the 15 runs C1-C5 only (C7 dropped).
+  A positive value means a farther nearest-poisoned view goes with a higher (less suppressed) target PSNR.
+- **E4.** Resolvability ratio R = |mean(C7) - mean(C3)| / sample sd (ddof=1) of C3's three per-seed values, for target PSNR,
+  under both aggregates (mean(.) = mean over the three seeds of the per-run value).
+- **E5.** Curve-still-moving: |mean(C5) - mean(C4)| for target PSNR and for plate PSNR, each divided by the mean of the two
+  per-condition sample sds (ddof=1) at C4 and C5, under both aggregates (four ratios).
+- **E6.** Costs of each option per C, from the measured speed test.
+- **E7.** Feasibility facts for RP and NF (read-only probes: real-photo data or inpainting code present; `tinycudann` /
+  `nerfstudio` importable in the project environment; `nvcc --version`). Facts only; no threshold attached.
+- **Aggregates (both used everywhere above).** (i) the pre-registered D-043 aggregate: mean over views of per-view PSNR
+  within a run; (ii) pooled-MSE PSNR: per-view MSE = 10^(-PSNR/10), averaged over views, converted back to PSNR. Both
+  are computed by `metrics.followup.run_region_aggregates` (keys `mean_of_psnr` and `pooled_mse_view_mean_psnr`; the
+  pixel-weighted variant of D-044 is not used here). Condition value = mean over seeds of the per-run value.
+
+### E. Decision rule (mechanical; thresholds fixed here)
+- **C8 qualifies iff ALL hold.**
+  - **G1:** for each of seeds 1, 2, 3, the E2 mean E1 of C8 is below the minimum over C3's three per-seed E1 means AND
+    below C7's E1 mean. (Reading fixed here: all three C8 seeds must satisfy it, the stricter reading.)
+  - **G2:** E3 partial correlation is positive under both aggregates for the 18-run set AND positive for the 15-run set
+    (the 15-run set under both aggregates as well).
+  - **G3:** E4's R >= 1.5 under both aggregates.
+  - **G4:** C8 plus calibration (4 runs) fit the cost cap.
+- **B100 qualifies iff:** all four E5 ratios (target and plate, under both aggregates) are >= 1.0, AND B100 plus calibration
+  (4 runs) fit the cap.
+- **Selection:** if C8 qualifies, choose C8 (it addresses the METHODOLOGY §1 corollary directly). Else if B100 qualifies,
+  choose B100. Else choose NONE, report the RP/NF probe facts for the lead to decide, and start no preparation. If both
+  qualify and both fit the cap together (7 runs incl. one calibration), still choose C8 first and list B100 as a follow-up.
+
+### F. Predictions fixed in advance for the chosen option (reported whichever way they come out)
+- **C8:** P1 the C8 target PSNR mean is below C3's under the pre-registered aggregate; P2 the same under pooled-MSE;
+  P3 the ordering of C3, C7, C8 by E1 mean matches their ordering by target fidelity (target PSNR) under both aggregates.
+  Per-view distributions and E2-style relationships are reported, labelled exploratory.
+- **B100:** P1 mean plate PSNR exceeds the maximum of C5's three per-seed values; P2 target PSNR is below C5's minimum
+  per-seed value; both under both aggregates; per-view distributions reported.
+
+### G. Calibration and hardware
+Re-run C3 seed 1 on this laptop and compare it with HPC C3 seed 1 as ONE paired data point, interpreted only against C3's
+per-seed spread; no equivalence claim. C3 seeds 2 and 3 are added to calibration only if the cap still holds. Every
+comparison of a Phase 9 run with a Phase 6 run crosses GPU architectures (Turing -> Blackwell) and is labelled so; the driver and
+torch build are recorded with every run.
+
+### H. Not used
+The D-044 Part 3 depth/opacity diagnostics are not used by this rule.
+
+### I. Reversibility and bug handling
+Additive. If a defect in this rule is found after the evidence is computed, it is fixed only by a new entry that says why
+and reports the old and the new outcome; this entry is not edited.

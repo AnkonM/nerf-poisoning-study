@@ -217,3 +217,8 @@ diagnostics, qualitative-figure rule) is pre-registered in `DECISION_LOG.md` D-0
 **Clarification 2026-11-14 (not a deviation):** the Phase 8 follow-up diagnostics (paired C3/C6 differences, seed-by-condition
 grids, mean-of-MSE aggregates, per-view spread, exploratory depth/opacity at seed 1) are pre-registered as descriptive or
 exploratory in `DECISION_LOG.md` D-044, before they were computed. §1-§7 and the D-042/D-043 definitions are unchanged.
+
+**Clarification 2026-11-14 (not a deviation):** the Phase 9 decision rule (candidate extensions C8 coverage-controlled
+selection and B100 100 % budget anchor, evidence quantities, thresholds, cost cap, predictions) is pre-registered in
+`DECISION_LOG.md` D-045, before the decision evidence was computed. Conditions added there are labelled extensions beyond the
+§5 matrix and the §2 budget list; §1-§7 are unchanged.

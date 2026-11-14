@@ -181,7 +181,9 @@ def farther_than_reference(per_view: Sequence[Dict], ref: Dict[int, Dict]) -> Di
     both = (d_gt > d_ref) & (d_plate > d_ref)
     n = len(v)
     return {"n_views": n, "n_both": int(both.sum()), "fraction_both": float(both.sum() / n),
-            "n_gt_only_farther": int((d_gt > d_ref).sum()), "n_plate_only_farther": int((d_plate > d_ref).sum())}
+            "n_gt_only_farther": int((d_gt > d_ref).sum()), "n_plate_only_farther": int((d_plate > d_ref).sum()),
+            # context: over views, the largest value of min(d_gt, d_plate) / d_ref (> 1 would mean farther from both)
+            "max_over_views_min_ratio": float(np.minimum(d_gt / d_ref, d_plate / d_ref).max())}
 
 
 # ---- 2e -----------------------------------------------------------------------------------

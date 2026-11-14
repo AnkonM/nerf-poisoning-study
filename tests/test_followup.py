@@ -136,6 +136,7 @@ def test_farther_than_reference_strict_and_counts():
     r = FU.farther_than_reference(pv, ref)
     assert r["n_views"] == 3 and r["n_both"] == 1 and r["fraction_both"] == pytest.approx(1 / 3)
     assert r["n_gt_only_farther"] == 2 and r["n_plate_only_farther"] == 1
+    assert r["max_over_views_min_ratio"] == pytest.approx(2.0)       # view 0: both ratios 2.0 (view 1: 2.0 vs 0.2; view 2: 1.0)
 
 
 def test_spread_stats():

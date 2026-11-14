@@ -51,3 +51,6 @@ experiments/runs/
 
 # D-041: eval-view renders are derived artifacts (float16 arrays + PNGs); never commit them
 experiments/renders/
+
+# D-044: exploratory depth/opacity arrays are derived artifacts; never commit them
+experiments/renders_diagnostics/

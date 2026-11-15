@@ -288,7 +288,7 @@ class Sweep:
             if os.path.exists(eval_json):
                 os.remove(eval_json)
             cmd = [c.python, os.path.join(c.repo_root, "scripts", "evaluate.py"), run.config_path, final,
-                   "--seed", str(run.seed), "--run-id", run.run_id]
+                   "--seed", str(run.seed), "--run-id", run.run_id] + self._eval_extra_args()
             st.append_event(rd, "eval_start", attempt=attempt)
             rc = self._run_child(cmd, rd, "eval.log", False, iterations, run)
             st.append_event(rd, "eval_end", attempt=attempt, returncode=rc)
@@ -365,6 +365,10 @@ class Sweep:
             raise
         self._write_record(run, iterations, rd, ev, pf)
         self.say("[%s] COMPLETE (test PSNR %.3f dB over %d views)" % (run.run_id, ev["test_psnr"], ev["n_test_views"]))
+
+    def _eval_extra_args(self) -> List[str]:
+        """Extra evaluate.py arguments. Phase 6: none. (Phase 9 profile: the eval-only chunk, D-047.)"""
+        return []
 
     def _write_record(self, run: Run, iterations: int, rd: str, ev: Dict, pf: Dict) -> None:
         from utils.sweep_record import write_run_record

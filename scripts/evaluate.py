@@ -42,6 +42,10 @@ def main() -> None:
         "Only the test/val splits are actually scored, but load_blender_data "
         "still needs a real train/ directory + transforms_train.json to load.",
     )
+    parser.add_argument(
+        "--eval-chunk-size", type=int, default=None,
+        help="Optional ray chunk for these renders only (D-047). Default: the config's training.chunk_size.",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -98,7 +102,8 @@ def main() -> None:
     print(f"Evaluating {len(i_test)} test views with per-image progress logging...")
     t0 = time.time()
     test_psnr = evaluate_psnr(
-        images, poses, i_test, hwf, K, cfg["training"]["chunk_size"], render_kwargs_test, show_progress=True
+        images, poses, i_test, hwf, K, args.eval_chunk_size or cfg["training"]["chunk_size"], render_kwargs_test,
+        show_progress=True
     )
     elapsed = time.time() - t0
     print(f"\nFinal test-set PSNR: {test_psnr:.3f} dB over {len(i_test)} views, {elapsed / 60:.1f} min")

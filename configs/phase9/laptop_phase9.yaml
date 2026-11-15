@@ -18,6 +18,11 @@ preflight:
   gpu_wait_s: 30
   min_free_gb: 20
 
+# Eval-only ray chunk (D-047): applied to validation and final evaluation renders ONLY, never to training batches.
+# 2048 is the value tested (bit-identical renders vs 32768 on a Phase 6 checkpoint) and used by D-044.
+eval:
+  eval_chunk_size: 2048
+
 paths:
   results_csv: experiments/results/results_phase9.csv     # same row schema as results.csv + a hardware_profile column
   run_id_prefix: lp9_                                      # keeps run dirs/log entries distinct from the HPC runs (e.g. C3_seed1)

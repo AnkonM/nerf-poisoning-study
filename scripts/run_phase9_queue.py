@@ -52,7 +52,7 @@ def main() -> int:
     cfg = SweepConfig(repo_root=REPO_ROOT, paths=paths, config_dir=os.path.join(REPO_ROOT, prof["queue"]["config_dir"]),
                       only=a.only, allow_dirty=a.allow_dirty, dry_run=a.dry_run, max_retries=a.max_retries,
                       poll_s=a.poll_s, min_free_gb=float(pf["min_free_gb"]), gpu_mem_max_mib=float(pf["gpu_mem_max_mib"]),
-                      gpu_wait_s=float(pf["gpu_wait_s"]))
+                      gpu_wait_s=float(pf["gpu_wait_s"]), extra_train_args=H.train_extra_args(prof))
     os.makedirs(paths.logs, exist_ok=True)
 
     def log(msg):

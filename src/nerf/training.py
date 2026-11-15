@@ -150,6 +150,13 @@ def _render_kwargs(cfg, network_query_fn, model, model_fine, use_viewdirs, train
     return kwargs
 
 
+def eval_chunk_size(training_cfg: Dict[str, Any]) -> int:
+    """Ray chunk for validation / final evaluation renders only. `training.eval_chunk_size` is OPTIONAL (D-047, Phase 9
+    laptop profile); when absent this is `training.chunk_size`, i.e. the Phase 6 behaviour. Training batches (batch_size
+    rays) never use it. Chunking only splits independent rays, so the rendered values do not depend on it (D-047 test)."""
+    return int(training_cfg.get("eval_chunk_size") or training_cfg["chunk_size"])
+
+
 def evaluate_psnr(
     images: np.ndarray,
     poses: np.ndarray,
@@ -377,7 +384,7 @@ def train_from_config(
             tqdm.write(f"[{run_id}] iter {i} loss {last_loss:.5f} psnr {last_psnr:.3f}")
 
         if i % logging_cfg["eval_every"] == 0 and i > 0:
-            val_psnr = evaluate_psnr(images, poses, i_val[:5], hwf, K, training_cfg["chunk_size"], render_kwargs_test)
+            val_psnr = evaluate_psnr(images, poses, i_val[:5], hwf, K, eval_chunk_size(training_cfg), render_kwargs_test)
             writer.add_scalar("val/psnr_subset", val_psnr, i)
             print(f"[{run_id}] iter {i} val-subset PSNR {val_psnr:.3f} dB")
 
@@ -391,7 +398,7 @@ def train_from_config(
               "run scripts/evaluate.py separately, per docs/DECISION_LOG.md D-016.")
         test_psnr = None
     else:
-        test_psnr = evaluate_psnr(images, poses, i_test, hwf, K, training_cfg["chunk_size"], render_kwargs_test)
+        test_psnr = evaluate_psnr(images, poses, i_test, hwf, K, eval_chunk_size(training_cfg), render_kwargs_test)
         writer.add_scalar("test/psnr_final", test_psnr, n_iters - 1)
     writer.close()
 

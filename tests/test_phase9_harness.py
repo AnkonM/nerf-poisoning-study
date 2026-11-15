@@ -134,3 +134,28 @@ def test_phase6_paths_and_record_defaults_are_unchanged():
     from utils.sweep_record import write_run_record
     sig = inspect.signature(write_run_record)
     assert all(sig.parameters[k].default is None for k in ("where_run", "note", "row_extra", "append_fn"))
+
+
+# ---- D-047: eval-only chunk override --------------------------------------------------------
+def test_eval_chunk_size_defaults_to_chunk_size_and_override_wins():
+    from nerf.training import eval_chunk_size
+    assert eval_chunk_size({"chunk_size": 32768}) == 32768                      # Phase 6 behaviour: key absent
+    assert eval_chunk_size({"chunk_size": 32768, "eval_chunk_size": None}) == 32768
+    assert eval_chunk_size({"chunk_size": 32768, "eval_chunk_size": 2048}) == 2048
+
+
+def test_phase9_passes_the_eval_chunk_to_train_and_evaluate_only(tmp_path, monkeypatch):
+    sweep, prof, cfg = _sweep(tmp_path, monkeypatch)
+    assert prof["eval"]["eval_chunk_size"] == 2048
+    assert H.train_extra_args(prof) == ["--eval-chunk-size", "2048"]
+    assert sweep._eval_extra_args() == ["--eval-chunk-size", "2048"]
+    plain = sr.Sweep(sr.SweepConfig(repo_root=REPO, paths=st.Paths(str(tmp_path / "p6")), config_dir="x"), log=lambda m: None)
+    assert plain._eval_extra_args() == [] and "--eval-chunk-size" not in plain._train_cmd(
+        __import__("test_sweep_runner").make_run(), False)
+
+
+def test_train_and_evaluate_scripts_accept_the_flag_with_default_none():
+    import re
+    for s in ("train.py", "evaluate.py"):
+        src = open(os.path.join(REPO, "scripts", s)).read()
+        assert re.search(r'"--eval-chunk-size",\s*type=int,\s*default=None', src)

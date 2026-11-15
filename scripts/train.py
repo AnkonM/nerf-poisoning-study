@@ -96,9 +96,16 @@ def main() -> None:
         "(docs/PROJECT_STRUCTURE.md), which is meaningless if the tree has "
         "uncommitted changes.",
     )
+    parser.add_argument(
+        "--eval-chunk-size", type=int, default=None,
+        help="Optional ray chunk for validation and final-eval renders ONLY (D-047); never used for training batches. "
+        "Default: the config's training.chunk_size (unchanged behaviour).",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    if args.eval_chunk_size:
+        cfg["training"]["eval_chunk_size"] = args.eval_chunk_size
     dataset_cfg = cfg["dataset"]
     is_condition = bool(dataset_cfg.get("path_template"))
 

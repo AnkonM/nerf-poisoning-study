@@ -128,6 +128,10 @@ class Phase9Sweep(Sweep):
         super().__init__(cfg, log)
         self.profile = profile
 
+    def _eval_extra_args(self):
+        n = self.profile.get("eval", {}).get("eval_chunk_size")
+        return ["--eval-chunk-size", str(int(n))] if n else []
+
     def queue(self):
         q = build_phase9_queue(self.profile, self.cfg.repo_root, self.cfg.manifest_path)
         return [r for r in q if r.run_id in set(self.cfg.only)] if self.cfg.only else q
@@ -148,10 +152,16 @@ class Phase9Sweep(Sweep):
         write_run_record(
             self.cfg, run, iterations, rd, ev, pf,
             where_run="local — WSL2 laptop, hardware profile `%s` (Phase 9 extension, D-045/D-046)" % prof,
-            note=("**Phase 9 extension run (%s, role: %s).** Hardware profile `%s`. Comparisons with Phase 6 runs cross GPU "
+            note=("**Phase 9 extension run (%s, role: %s).** Hardware profile `%s`; eval-only ray chunk %s (D-047). Comparisons with Phase 6 runs cross GPU "
                   "architectures (Quadro RTX 5000 Turing -> RTX 5060 Blackwell). Not part of the METHODOLOGY §5 matrix."
-                  % (run.condition_id, getattr(run, "role", ""), prof)),
+                  % (run.condition_id, getattr(run, "role", ""), prof, self.profile.get("eval", {}).get("eval_chunk_size", "config default"))),
             row_extra={"hardware_profile": prof}, append_fn=append_results_row_p9)
+
+
+def train_extra_args(profile: Dict) -> List[str]:
+    """train.py arguments the Phase 9 profile adds: the eval-only chunk (validation + final eval renders; never training)."""
+    n = profile.get("eval", {}).get("eval_chunk_size")
+    return ["--eval-chunk-size", str(int(n))] if n else []
 
 
 def phase9_paths(experiments_root: str, profile: Dict) -> Phase9Paths:

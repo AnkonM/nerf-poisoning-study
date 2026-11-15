@@ -70,8 +70,8 @@ def main() -> int:
         return 0
     if a.command == "status":
         print(format_status(sweep))
-        print("\nNOTE: the ETA lines above use Phase 6 (HPC) constants (5.83 it/s, 0.55 h/run overhead). Laptop speed test "
-              "(D-046): 5.36 it/s and ~4.4 h/run of validation + final eval => ~14.7 h per run.")
+        print("\nNOTE: the ETA lines above use Phase 6 (HPC) constants (5.83 it/s, 0.55 h/run overhead). Laptop measurements "
+              "(D-047): ~5.49 it/s sustained, ~0.5 h/run of validation + final eval => ~10.7 h per run.")
         return 0
     if a.command == "clear-stopped":
         print("STOPPED marker removed" if st.clear_stopped(paths) else "no STOPPED marker present")

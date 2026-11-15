@@ -2903,3 +2903,49 @@ and reports the old and the new outcome; this entry is not edited.
     that self-match).
   - Calibration comparisons with Phase 6 cross GPU architectures (Turing -> Blackwell).
 - **Reversibility.** Additive; nothing locked is touched.
+
+## D-047 — Phase 9 laptop profile: eval-only ray chunk 2048 (pre-launch checks)
+
+- **Date:** 2026-11-15. D-046's selection (B100) and every D-045 threshold are unchanged. This entry changes only how the Phase 9
+  harness profile computes validation and final-evaluation renders, and corrects D-046's cost projection.
+- **What the chunk setting touches (code reading).** `training.chunk_size` (32768) is the ray chunk of `nerf.rendering.render`.
+  Training batches are `training.batch_size` rays (1024 in `final_scene.yaml`, 4096 in `base.yaml`), always <= chunk, so they are
+  one chunk whatever the chunk size is: **training is not affected**. The chunk is used by the in-training validation (5 views every
+  10,000 iterations) and final eval (`src/nerf/training.py`), by `scripts/evaluate.py` (75 views) and by `render_eval_views`
+  (`src/utils/render_eval.py`, via `cfg["training"]["chunk_size"]`). `netchunk` (65536 points per network forward) is separate.
+- **Equivalence test** (`experiments/results/phase9/chunk_equivalence.jsonl`; Phase 6 checkpoint `C3_seed1/200000.tar`, test views
+  110/135/160, fp32, perturb 0, GPU):
+
+  | ray chunk | max abs pixel diff vs 32768 | PSNR vs GT (dB) | PSNR diff vs 32768 | s/view | peak reserved | peak allocated | nvidia-smi peak used |
+  |---|---|---|---|---|---|---|---|
+  | 2048 | 0.0 | 38.822 / 42.684 / 38.042 | 0.0 | 10.7 | 0.64 GiB | 0.46 GiB | 1328 MiB |
+  | 4096 | 0.0 | same | 0.0 | 11.1 | 0.94 GiB | 0.65 GiB | 1636 MiB |
+  | 32768 | (reference) | same | | 11.4 | 6.00 GiB | 4.56 GiB | 6816 MiB |
+
+  Windows "GPU Adapter Memory Shared Usage" counters were unchanged between before and after each setting (683/0/177/0 MB, within
+  18 MB). The standalone 32768 render did not exceed 8 GiB reserved.
+- **Gate (max abs diff < 1e-3 and PSNR diff < 0.01 dB): PASS** (both 0.0 here; 3 views, one checkpoint).
+- **Change (additive; defaults reproduce Phase 6).** Optional `training.eval_chunk_size` (`nerf.training.eval_chunk_size`; falls back to
+  `chunk_size`), set only through the new optional flag `--eval-chunk-size` of `scripts/train.py` (validation + final eval) and
+  `scripts/evaluate.py`. The Phase 9 profile (`configs/phase9/laptop_phase9.yaml`, `eval.eval_chunk_size: 2048`) passes it to both
+  the training child and the evaluation child (`Phase9Sweep`); the Phase 6 queue passes nothing. Tests: `tests/test_phase9_harness.py`
+  (default fallback, override wins, Phase 9 passes the flag to train and evaluate, Phase 6 commands do not contain it, both
+  scripts declare the flag with default None). Condition configs are untouched; `render_eval_views` is untouched.
+- **In-process check** (scratch, control config, 2,500 iterations, validation at 2,000, `--eval-chunk-size 2048`): the validation
+  PSNR was 34.631 dB, identical to the same run with chunk 32768; validation took 56.3 s for 5 views (11.3 s/view) against 464 s
+  (92.9 s/view); torch peak reserved 3.43 GiB against 8.27 GiB; nvidia-smi peak 4199 MiB against 7711 MiB. (D-016 documents the
+  in-process-validation VRAM contention.)
+- **Sustained speed** (real `lp9_C3_seed1` config, scratch `--output-root`, validation disabled, 1877 s, 10,300 iterations;
+  `experiments/results/phase9/sustained_thermal_30min.csv`, sampled about every 9 s): 5.53 it/s in the first 5 minutes, 5.48 in the
+  last 5 minutes (6 windows of 5 min: 5.53 / 5.47 / 5.48 / 5.48 / 5.50 / 5.49; overall 5.49). nvidia-smi reported `SW Thermal
+  Slowdown` active in 29/32 samples of the first 5 minutes and 32/32 of the last 5, GPU 84-88 C, `HW Slowdown` never, `SW Power
+  Cap` in 2/32 then 0/32 samples; the reported SM clock was 217 MHz in the throttled samples while training ran at 5.5 it/s (the
+  clock reading under WSL was not reconciled with the measured speed). Windows thermal zone `tz01`: 76.9-96.9 C in the first 5
+  minutes, 95.9-96.9 C in the last 5. A run of 30 minutes says nothing about 10 hours.
+- **Revised cost** (D-045 C formula, measured values: 5.4875 it/s over the 30 minutes, 56.3 s per 5-view validation x 19 events,
+  final eval 75 views x 11.3 s = 845 s): per run = 10.12 h training + 0.30 h validation + 0.23 h final eval = **10.66 h**.
+  Calibration + B100 seeds 1-3 (4 runs) = **42.6 h** of the 60 h cap (margin 17.4 h; D-046 had 59.0 h). Adding C3 seeds 2-3 (6 runs)
+  = 63.9 h does NOT fit; adding one of them (5 runs) = 53.3 h fits but is not queued. Both options together (7 runs) = 74.6 h
+  still does not fit. D-045's gates are therefore unchanged: C8 still fails G2 and G3 (not cost-related), B100 still qualifies,
+  and the selection is unchanged. Not included: post-run `render_eval_views` and `compute_metrics` time.
+- **Reversibility.** Remove `eval.eval_chunk_size` from the profile to restore chunk 32768 for Phase 9 as well.

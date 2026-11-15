@@ -1,7 +1,7 @@
 # Phase 9 (laptop) runbook — B100 selected (D-045 / D-046). NOTHING HAS BEEN LAUNCHED.
 
 Queue (one process at a time, in this order): `lp9_C3_seed1` (calibration), `lp9_B100_seed1`, `lp9_B100_seed2`, `lp9_B100_seed3`.
-Projected 59.0 h of the 60 h cap (D-046); C3 seeds 2-3 are NOT queued (+29.5 h would exceed the cap).
+Projected 42.6 h of the 60 h cap (D-047; D-046's 59.0 h is superseded); C3 seeds 2-3 are NOT queued (both would reach 63.9 h).
 
 ## Before launching
 1. `git status` must be clean (the preflight refuses a dirty tree except under `experiments/logs/`, `experiments/results/`).
@@ -12,7 +12,7 @@ Projected 59.0 h of the 60 h cap (D-046); C3 seeds 2-3 are NOT queued (+29.5 h w
 - Launch (survives closing the terminal; detach with Ctrl-b d):
   `tmux new -d -s p9 ".venv/bin/python scripts/run_phase9_queue.py --hardware-profile laptop_phase9 run 2>&1 | tee -a experiments/logs/phase9_stdout.log"`
   (`nohup ... &` also works.) Re-running the same command resumes: completed runs are skipped, a partial run resumes from its latest checkpoint.
-- Status: `.venv/bin/python scripts/run_phase9_queue.py --hardware-profile laptop_phase9 status` (its ETA lines use HPC constants; laptop figures are 5.36 it/s and ~14.7 h per run).
+- Status: `.venv/bin/python scripts/run_phase9_queue.py --hardware-profile laptop_phase9 status` (its ETA lines use HPC constants; laptop figures are ~5.49 it/s and ~10.7 h per run, D-047).
 - Graceful stop (finishes the CURRENT run first): `... stop`.  Immediate stop (<= 25,000 iterations, ~1.3 h, redone on resume): `... stop --now`.
 - After a STOPPED marker (exit 10) investigate, then `... clear-stopped`.
 - Attach: `tmux attach -t p9`.
@@ -25,9 +25,9 @@ Outputs: `experiments/runs/lp9_*` (git-ignored), `experiments/logs/lp9_*.md`, `e
 - Windows Update restarts, `wsl --shutdown`, or the WSL VM shutting down kill the harness and the child. Restart is safe (resume, <= 25k iterations lost, RNG restored, D-039). Whether a background process alone keeps the WSL VM alive after the last terminal closes was NOT tested; to be safe keep one Windows-side session open (e.g. `wsl.exe -- sleep infinity`).
 - The preflight fails closed if the GPU, driver, torch build or hostname differ from `configs/phase9/laptop_phase9.yaml` (a Windows driver update therefore halts the queue until the profile is deliberately updated and recorded).
 
-## Findings to know before launching (facts; no change made)
-- Validation of 5 views took 464 s (93 s/view) at the config's `chunk_size` 32768; torch reserved 8.27 GiB against 8151 MiB of VRAM. D-044's depth renders of the same size at chunk 2048 took ~12 s/view. The 4.4 h per run of validation + final eval in the cost estimate is therefore probably dominated by that chunk size; a smaller eval chunk was NOT tried and would differ from the HPC config (the lead's decision).
-- The speed test ran 2,500 iterations only; the GPU reported `SW Thermal Slowdown` at 85-86 C. Sustained 10-hour speed is unmeasured; the cap margin is 1.0 h.
+## Findings to know before launching (D-047)
+- Validation and final eval use an eval-only ray chunk of 2048 in this profile (`eval.eval_chunk_size`); renders were bit-identical to chunk 32768 on a Phase 6 checkpoint, and in-process validation fell from 464 s to 56 s per 5 views.
+- Sustained speed over 30 minutes: 5.53 -> 5.48 it/s with `SW Thermal Slowdown` reported (GPU 84-88 C, Windows thermal zone ~96 C). Ten-hour behaviour is unmeasured.
 
 ## Post-run plan (not started)
 1. `scripts/render_eval_views.py` and `scripts/compute_metrics.py` on the new runs, into a Phase 9 output location (never into `per_run.csv`, `experiments/renders/` or the Phase 8 outputs).
